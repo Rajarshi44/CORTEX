@@ -45,3 +45,6 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 110
+
+[tool.setuptools]
+packages = ["app"]

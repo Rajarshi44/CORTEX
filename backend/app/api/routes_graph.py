@@ -4,9 +4,11 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import ORJSONResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import current_user
+from ..auth import current_user, require_role
 from ..db import TimelineEvent, User, get_session
 from ..graph import queries as Q
 from ..graph.analytics import actor_projection, removal_impact
@@ -136,7 +138,50 @@ def entity(eid: str, db: Annotated[Session, Depends(get_session)], _: Annotated[
         d["money"] = Q.money_flow(db, G, D, eid)
     if G.nodes[eid]["type"] in ("PERSON", "PHONE"):
         d["calls"] = Q.call_profile(db, G, D, eid)
+    from ..db import EntityNote
+    notes = db.query(EntityNote).filter(EntityNote.entity_id == eid).order_by(EntityNote.created_at.desc()).all()
+    d["notes"] = [{"id": n.id, "username": n.username, "text": n.text, "created_at": n.created_at.isoformat()} for n in notes]
     return d
+
+
+class NoteIn(BaseModel):
+    text: str
+
+@router.post("/entities/{eid}/notes", dependencies=[Depends(require_role("analyst"))])
+def add_entity_note(eid: str, body: NoteIn, db: Annotated[Session, Depends(get_session)], user: Annotated[User, Depends(current_user)]):
+    from ..db import EntityNote, Entity
+    if not db.get(Entity, eid):
+        raise HTTPException(404, "Entity not found")
+    note = EntityNote(entity_id=eid, username=user.username, text=body.text)
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return {"id": note.id, "username": note.username, "text": note.text, "created_at": note.created_at.isoformat()}
+
+@router.put("/entities/{eid}/notes/{note_id}", dependencies=[Depends(require_role("analyst"))])
+def update_entity_note(eid: str, note_id: int, body: NoteIn, db: Annotated[Session, Depends(get_session)], user: Annotated[User, Depends(current_user)]):
+    from ..db import EntityNote
+    note = db.get(EntityNote, note_id)
+    if not note or note.entity_id != eid:
+        raise HTTPException(404, "Note not found")
+    if note.username != user.username and user.role != "admin":
+        raise HTTPException(403, "Not authorized to edit this note")
+    note.text = body.text
+    db.commit()
+    db.refresh(note)
+    return {"id": note.id, "username": note.username, "text": note.text, "created_at": note.created_at.isoformat()}
+
+@router.delete("/entities/{eid}/notes/{note_id}", dependencies=[Depends(require_role("analyst"))])
+def delete_entity_note(eid: str, note_id: int, db: Annotated[Session, Depends(get_session)], user: Annotated[User, Depends(current_user)]):
+    from ..db import EntityNote
+    note = db.get(EntityNote, note_id)
+    if not note or note.entity_id != eid:
+        raise HTTPException(404, "Note not found")
+    if note.username != user.username and user.role != "admin":
+        raise HTTPException(403, "Not authorized to delete this note")
+    db.delete(note)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/entities/{eid}/ego")

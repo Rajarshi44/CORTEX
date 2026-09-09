@@ -31,9 +31,10 @@ function Sources() {
   const { data: src } = useSources();
   const { data: health, refetch: recheck, isFetching: checking } = useSourcesHealth();
   const [docId, setDocId] = useQueryState("doc", parseAsString);
+  const [entityId] = useQueryState("entity", parseAsString);
   const [docType, setDocType] = useState("");
   const [docQ, setDocQ] = useState("");
-  const { data: docs } = useDocuments({ source_type: docType || undefined, q: docQ || undefined, limit: 80 });
+  const { data: docs } = useDocuments({ source_type: docType || undefined, q: docQ || undefined, limit: 80, entity_id: entityId || undefined });
   const { data: doc } = useDocument(docId);
   const invalidate = useInvalidateSheet();
   const user = useSheet((s) => s.user);
