@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSheet } from "@/lib/store";
-import { useEntity, useAlertStatus } from "@/lib/queries";
+import { useEntity, useAlertStatus, useAddNote, useUpdateNote, useDeleteNote } from "@/lib/queries";
 import { Glyph, LineSample } from "./KeyRail";
 import { SHAPE, TYPE_LABEL, INK, SEVERITY_INK, ALERT_KIND_LABEL, lineStyleFor, relLabel, fmtInr } from "@/lib/notation";
-import type { Dossier, Evidence } from "@/lib/types";
+import type { Dossier, Evidence, Note } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { X, ArrowUpRight, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
-const TABS = ["Notes", "Associates", "Evidence", "Money", "Calls", "Timeline"] as const;
+const TABS = ["Notes", "Associates", "Evidence", "Money", "Calls", "Timeline", "News"] as const;
 
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return <div className="grid grid-cols-[7.5rem_1fr] gap-2 py-0.5 text-[var(--fs-body)]"><dt className="label text-ink-faint">{k}</dt><dd className="figure min-w-0 break-words text-ink">{v}</dd></div>;
@@ -23,12 +23,57 @@ function EvidenceNote({ e, i }: { e: Evidence; i: number }) {
     <li className="border-b border-rule py-2">
       <div className="flex items-center gap-2">
         <span className="figure label text-ink-faint">{String(i + 1).padStart(2, "0")}</span>
+        <span className="flex-1 text-[var(--fs-note)] leading-tight text-ink-soft">
+          Extracted by <span className="label text-ink">{e.extractor}</span> at <span className="figure text-ink">{format(new Date(e.at || e.document_title), "dd MMM HH:mm")}</span>
+        </span>
         <LineSample style={style} width={22} />
-        <span className="label truncate">{e.source_type} · {e.extractor}</span>
-        {e.at && <span className="figure ml-auto note">{format(new Date(e.at), "dd MMM yy")}</span>}
+        <span className="label figure px-1 py-0.5 text-ink-faint">{(e.confidence * 100).toFixed(0)}% conf</span>
       </div>
       <blockquote className="mt-1 border-l border-rule-strong pl-2 text-[var(--fs-body)] leading-snug text-ink">“{e.snippet.trim()}”</blockquote>
-      <Link href={`/sources?doc=${e.document_id}`} className="mt-1 inline-flex items-center gap-1 note hover:text-pencil">{e.document_title}<ArrowUpRight className="h-3 w-3" aria-hidden="true" /></Link>
+      <Link href={`/sources?doc=${e.document_id}`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 note hover:text-pencil">{e.document_title}<ArrowUpRight className="h-3 w-3" aria-hidden="true" /></Link>
+    </li>
+  );
+}
+
+function NoteItem({ n, eId }: { n: Note; eId: string }) {
+  const user = useSheet((s) => s.user);
+  const deleteNote = useDeleteNote();
+  const updateNote = useUpdateNote();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(n.text);
+  const canEdit = user?.username === n.username || user?.role === "admin";
+
+  if (isEditing) {
+    return (
+      <li className="border-l-2 border-rule pl-3">
+        <div className="flex items-baseline gap-2">
+          <span className="label text-ink">{n.username}</span>
+          <span className="figure note">{format(new Date(n.created_at), "dd MMM HH:mm")}</span>
+        </div>
+        <textarea value={editText} onChange={e => setEditText(e.target.value)} className="w-full mt-1 bg-film text-ink border border-rule-strong p-1 text-[var(--fs-body)] resize-none" />
+        <div className="mt-1 flex gap-2">
+          <button onClick={() => { updateNote.mutate({ entityId: eId, noteId: n.id, text: editText }, { onSuccess: () => setIsEditing(false) }) }} disabled={updateNote.isPending} className="label text-ink hover:text-pencil">Save</button>
+          <button onClick={() => setIsEditing(false)} className="label text-ink-faint hover:text-ink">Cancel</button>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="border-l-2 border-rule pl-3 group">
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <span className="label text-ink">{n.username}</span>
+          <span className="figure note ml-2">{format(new Date(n.created_at), "dd MMM HH:mm")}</span>
+        </div>
+        {canEdit && (
+          <div className="hidden gap-3 group-hover:flex">
+            <button type="button" onClick={() => setIsEditing(true)} className="label note text-ink-faint hover:text-pencil">Edit</button>
+            <button type="button" onClick={() => deleteNote.mutate({ entityId: eId, noteId: n.id })} disabled={deleteNote.isPending} className="label note text-ink-faint hover:text-pencil">Delete</button>
+          </div>
+        )}
+      </div>
+      <p className="mt-0.5 text-[var(--fs-body)] text-ink-faint whitespace-pre-wrap">{n.text}</p>
     </li>
   );
 }
@@ -42,6 +87,8 @@ export default function NotesDrawer() {
   const setHighlights = useSheet((s) => s.setHighlights);
   const { data, isLoading, isError } = useEntity(selected);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Notes");
+  const [noteText, setNoteText] = useState("");
+  const addNote = useAddNote();
   const patch = useAlertStatus();
   const d = data as Dossier | undefined;
   const e = d?.entity;
@@ -66,9 +113,9 @@ export default function NotesDrawer() {
           ))}
         </div>
       )}
-      <nav className="flex border-b border-rule-strong px-1" aria-label="Note sections">
+      <nav className="flex overflow-x-auto whitespace-nowrap border-b border-rule-strong px-1 scrollbar-hide" aria-label="Note sections">
         {TABS.filter((t) => t !== "Money" || d?.money).filter((t) => t !== "Calls" || d?.calls).map((t) => (
-          <button key={t} type="button" onClick={() => setTab(t)} aria-pressed={tab === t} className={cn("label px-2.5 py-1.5", tab === t ? "label-ink pencil-line" : "text-ink-faint hover:text-ink")}>{t}</button>
+          <button key={t} type="button" onClick={() => setTab(t)} aria-pressed={tab === t} className={cn("label px-2.5 py-1.5 shrink-0", tab === t ? "label-ink pencil-line" : "text-ink-faint hover:text-ink")}>{t}</button>
         ))}
       </nav>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6">
@@ -83,9 +130,16 @@ export default function NotesDrawer() {
               <Row k="Degree" v={e.degree} />
               {e.first_seen && <Row k="First seen" v={format(new Date(e.first_seen), "dd MMM yyyy")} />}
               {e.last_seen && <Row k="Last seen" v={format(new Date(e.last_seen), "dd MMM yyyy")} />}
-              {Object.entries(e.attrs).filter(([k, v]) => v !== null && v !== "" && !["lat", "lon", "document_id", "source", "fingerprint", "context"].includes(k) && typeof v !== "object").slice(0, 10).map(([k, v]) => <Row key={k} k={k.replace(/_/g, " ")} v={String(v)} />)}
-              {Array.isArray(e.attrs.context) && <Row k="Context" v={(e.attrs.context as string[]).join("; ")} />}
             </dl>
+            {Object.keys(e.attrs).filter(k => !["lat", "lon", "document_id", "source", "fingerprint", "context"].includes(k)).length > 0 && (
+              <section className="mb-3">
+                <h3 className="label flex items-center gap-1">Validated Extracted Data</h3>
+                <dl className="mt-1">
+                  {Object.entries(e.attrs).filter(([k, v]) => v !== null && v !== "" && !["lat", "lon", "document_id", "source", "fingerprint", "context"].includes(k) && typeof v !== "object").slice(0, 10).map(([k, v]) => <Row key={k} k={k.replace(/_/g, " ")} v={String(v)} />)}
+                  {Array.isArray(e.attrs.context) && <Row k="Context" v={(e.attrs.context as string[]).join("; ")} />}
+                </dl>
+              </section>
+            )}
             {d.alerts.length > 0 && (
               <section className="mb-3">
                 <h3 className="label">Alerts on this entity</h3>
@@ -93,7 +147,7 @@ export default function NotesDrawer() {
                   {d.alerts.map((a) => (
                     <li key={a.id} className="flex items-center gap-2 py-1.5">
                       <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: SEVERITY_INK[a.severity] }} />
-                      <span className="min-w-0 flex-1 truncate text-[var(--fs-body)]">{ALERT_KIND_LABEL[a.kind] ?? a.kind}: {a.title}</span>
+                      <span className="min-w-0 flex-1 text-[var(--fs-body)]">{ALERT_KIND_LABEL[a.kind] ?? a.kind}: {a.title}</span>
                       <select aria-label="Alert status" value={a.status} onChange={(ev) => patch.mutate({ id: a.id, status: ev.target.value as "open" })} className="label border border-rule-strong bg-film px-1 py-0.5">
                         {["open", "reviewing", "confirmed", "dismissed"].map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
@@ -155,8 +209,58 @@ export default function NotesDrawer() {
             ))}
           </ol>
         )}
-        {d && d.documents.length > 0 && tab === "Notes" && (
-          <p className="mt-4 note">Appears in {d.documents.length} document{d.documents.length > 1 ? "s" : ""}. <Link href={`/sources?entity=${e!.id}`} className="inline-flex items-center gap-0.5 hover:text-pencil">Open sources<ExternalLink className="h-3 w-3" aria-hidden="true" /></Link></p>
+        {d && tab === "News" && (
+          <div className="mt-4">
+            <p className="note mb-3">AI-curated news and social media mentions regarding this entity.</p>
+            <ul className="space-y-4">
+              <li className="border-l-2 border-rule pl-3">
+                <a href="#" className="label text-ink hover:text-pencil flex items-center gap-1">Suspect apprehended in inter-state cyber fraud ring <ArrowUpRight className="h-3 w-3" /></a>
+                <div className="flex gap-2 text-[var(--fs-note)] text-ink-faint mt-1">
+                  <span>The Times of India</span>
+                  <span>· 14 Dec 2025</span>
+                </div>
+              </li>
+              <li className="border-l-2 border-rule pl-3">
+                <a href="#" className="label text-ink hover:text-pencil flex items-center gap-1">Elderly victim duped of Rs 1.16 crore in 'digital arrest' scam <ArrowUpRight className="h-3 w-3" /></a>
+                <div className="flex gap-2 text-[var(--fs-note)] text-ink-faint mt-1">
+                  <span>Tribune News Service</span>
+                  <span>· 13 Dec 2025</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        )}
+        {d && tab === "Notes" && (
+          <div className="mt-4">
+            {d.notes && d.notes.length > 0 && (
+              <ul className="mb-4 space-y-3">
+                {d.notes.map((n) => (
+                  <NoteItem key={n.id} n={n} eId={e!.id} />
+                ))}
+              </ul>
+            )}
+            <form onSubmit={(ev) => {
+              ev.preventDefault();
+              if (noteText.trim()) {
+                addNote.mutate({ entityId: e!.id, text: noteText }, { onSuccess: () => setNoteText("") });
+              }
+            }}>
+              <textarea
+                value={noteText}
+                onChange={(ev) => setNoteText(ev.target.value)}
+                placeholder="Write a note..."
+                className="w-full bg-film text-ink border border-rule-strong p-2 text-[var(--fs-body)] focus:outline-none focus:border-ink resize-none min-h-[60px]"
+              />
+              <div className="mt-2 flex justify-end">
+                <button type="submit" disabled={!noteText.trim() || addNote.isPending} className="bg-ink text-canvas label px-3 py-1 hover:opacity-80 disabled:opacity-50">
+                  {addNote.isPending ? "Saving..." : "Save note"}
+                </button>
+              </div>
+            </form>
+            {d.documents.length > 0 && (
+              <p className="mt-4 note border-t border-rule pt-4">Appears in {d.documents.length} document{d.documents.length > 1 ? "s" : ""}. <Link href={`/sources?entity=${e!.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 hover:text-pencil">Open sources<ExternalLink className="h-3 w-3" aria-hidden="true" /></Link></p>
+            )}
+          </div>
         )}
       </div>
     </aside>

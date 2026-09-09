@@ -77,7 +77,10 @@ export interface Dossier {
   documents: { id: string; title: string; source_type: string }[];
   money?: { accounts: string[]; total_in: number; total_out: number; top_sources: [string, number][]; top_destinations: [string, number][]; transactions: { at: string; dir: "in" | "out"; counterparty: string; amount: number; mode: string; remarks: string }[] };
   calls?: { phones: string[]; total_calls: number; night_ratio: number; top_contacts: { phone: string; owner: string | null; owner_id: string | null; calls: number }[]; by_hour: number[] };
+  notes?: Note[];
 }
+
+export interface Note { id: number; username: string; text: string; created_at: string; }
 
 export interface AssistantAnswer { question: string; intent: string; answer: string; fallback_answer: string; llm: boolean; highlights: { nodes: string[]; edges: string[] }; data: unknown; highlight_nodes: { id: string; label: string; type: EntityType }[] }
 

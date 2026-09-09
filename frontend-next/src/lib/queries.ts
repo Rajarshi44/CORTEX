@@ -62,3 +62,29 @@ export function useInvalidateSheet() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries();
 }
+
+export function useAddNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entityId, text }: { entityId: string; text: string }) => api.addNote(entityId, text),
+    onSuccess: (_, { entityId }) => {
+      qc.invalidateQueries({ queryKey: qk.entity(entityId) });
+    },
+  });
+}
+
+export function useUpdateNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entityId, noteId, text }: { entityId: string; noteId: number; text: string }) => api.updateNote(entityId, noteId, text),
+    onSuccess: (_, { entityId }) => qc.invalidateQueries({ queryKey: qk.entity(entityId) }),
+  });
+}
+
+export function useDeleteNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entityId, noteId }: { entityId: string; noteId: number }) => api.deleteNote(entityId, noteId),
+    onSuccess: (_, { entityId }) => qc.invalidateQueries({ queryKey: qk.entity(entityId) }),
+  });
+}

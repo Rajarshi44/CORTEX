@@ -1,7 +1,7 @@
 import type {
   AiStatus, Alert, AlertStatus, AssistantAnswer, Community, DocumentDetail, DocumentSummary, Dossier, GeoPayload,
   EntityPage, GraphPayload, IngestStatus, KeyPlayer, Broker, LedgerVerify, LinkPrediction, LinkageReport, NodeView, PathHop,
-  RemovalImpact, SourceInfo, SourceReport, Summary, TimelineEvent, User, SheetIdentity,
+  RemovalImpact, SourceInfo, SourceReport, Summary, TimelineEvent, User, SheetIdentity, Note,
 } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -76,6 +76,9 @@ export const api = {
   entities: (p: { q?: string; types?: string[]; sort?: string; limit?: number; offset?: number; roles?: string[]; exclude_roles?: boolean } = {}) =>
     request<EntityPage>(`/api/entities${qs(p)}`),
   entity: (id: string) => request<Dossier>(`/api/entities/${id}`),
+  addNote: (id: string, text: string) => request<Note>(`/api/entities/${id}/notes`, { method: "POST", body: JSON.stringify({ text }) }),
+  updateNote: (id: string, noteId: number, text: string) => request<Note>(`/api/entities/${id}/notes/${noteId}`, { method: "PUT", body: JSON.stringify({ text }) }),
+  deleteNote: (id: string, noteId: number) => request<{ ok: boolean }>(`/api/entities/${id}/notes/${noteId}`, { method: "DELETE" }),
   ego: (id: string, depth = 1, limit = 120) => request<GraphPayload>(`/api/entities/${id}/ego${qs({ depth, limit })}`),
 
   // ---- analytics
@@ -124,7 +127,7 @@ export const api = {
     return request<{ started: boolean; file: string; source_type: string }>("/api/ingest/upload", { method: "POST", body: fd });
   },
   reset: () => request<{ ok: boolean }>("/api/ingest/reset", { method: "DELETE" }),
-  documents: (p: { source_type?: string; q?: string; limit?: number } = {}) => request<DocumentSummary[]>(`/api/ingest/documents${qs(p)}`),
+  documents: (p: { source_type?: string; q?: string; entity_id?: string; limit?: number } = {}) => request<DocumentSummary[]>(`/api/ingest/documents${qs(p)}`),
   document: (id: string) => request<DocumentDetail>(`/api/ingest/documents/${id}`),
 
   // ---- live sources
