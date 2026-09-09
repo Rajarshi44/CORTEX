@@ -61,3 +61,7 @@ ehthumbs.db
 # Agent / Tool local files & caches
 .impeccable/
 .claude/settings.local.json
+
+# Purge/repair backups (data artifacts, regenerated on demand)
+backend/data/purge-backup-*.json
+backend/data/export/
