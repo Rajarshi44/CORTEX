@@ -1,11 +1,46 @@
 """Application configuration (env-driven, sane defaults for local demo)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_dotenv_into_environ(*paths: Path) -> None:
+    """Put every key in these .env files onto `os.environ` (without overriding a real env var).
+
+    pydantic-settings reads a .env file into `Settings` only, and only under the `CNA_` prefix.
+    Third-party libraries and the provider layer look at `os.environ` for their own conventional
+    names, so a key someone pastes in as `GEMINI_API_KEY` or `FIRECRAWL_API_KEY` would otherwise
+    be silently ignored. This closes that gap for the one file `Settings` already reads.
+
+    Deliberately only `backend/.env`. The repo root holds its own .env for other tooling, and
+    hoovering that up would let an unrelated `CNA_DATABASE_URL` there quietly repoint the running
+    app at a different database. A real environment variable still wins over the file.
+    """
+    for path in paths:
+        try:
+            if not path.is_file():
+                continue
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip().lstrip("﻿")
+                if key.lower().startswith("export "):
+                    key = key[7:].strip()
+                value = value.strip().strip('"').strip("'")
+                if key and value:
+                    os.environ.setdefault(key, value)
+        except OSError:
+            continue
+
+
+_load_dotenv_into_environ(BASE_DIR / ".env")
 
 
 class Settings(BaseSettings):
@@ -37,6 +72,17 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     llm_model: str = "claude-sonnet-5"
     llm_enabled: bool = True
+
+    # Investigator agent providers, tried in this order; the first that answers takes the turn.
+    llm_providers: str = "gemini,nvidia,anthropic"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    nvidia_api_key: str | None = None
+    nvidia_model: str = "meta/llama-3.3-70b-instruct"
+    nvidia_base_url: str | None = None
+    # Open-web tier for the agent: with a key, Firecrawl renders JS and returns clean markdown;
+    # without one it falls back to the keyless DuckDuckGo + HTTP path.
+    firecrawl_api_key: str | None = None
     # zero-shot transformer NER (GLiNER). Requires the "neural" extra; off by default so the
     # default install stays small and offline-friendly.
     neural_ner_enabled: bool = False

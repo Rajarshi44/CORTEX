@@ -56,6 +56,7 @@ class SemanticIndex:
         self._vectors: np.ndarray | None = None
         self._passages: list[Passage] = []
         self._doc_count = -1
+        self._warming = False
         self.load_error: str | None = None
 
     # ------------------------------------------------------------------ model
@@ -115,6 +116,34 @@ class SemanticIndex:
     def invalidate(self):
         self._doc_count = -1
 
+    def ready(self) -> bool:
+        """True when a query can be answered without blocking on a model download or an index build."""
+        return self._vectors is not None and self.load_error is None
+
+    def warm(self, session_factory) -> None:
+        """Build the index off the request path.
+
+        First use downloads a ~130 MB ONNX model and embeds every document, which is a minute or
+        two. Doing that inside an analyst's first question looks like a hang, so the API warms the
+        index on startup and callers that arrive early fall back to keyword search.
+        """
+        if not self.available() or self._warming:
+            return
+        self._warming = True
+
+        def run():
+            db = session_factory()
+            try:
+                res = self.build(db)
+                log.info("semantic index warm: %s", res)
+            except Exception as exc:
+                log.warning("semantic warm-up failed: %s", exc)
+            finally:
+                db.close()
+                self._warming = False
+
+        threading.Thread(target=run, name="semantic-warm", daemon=True).start()
+
     # ------------------------------------------------------------------ query
     def search(self, db: Session, query: str, limit: int = 10, source_type: str | None = None) -> dict:
         state = self.build(db)
@@ -162,7 +191,8 @@ class SemanticIndex:
 
     def status(self) -> dict:
         return {"available": self.available(), "fastembed_installed": FASTEMBED_AVAILABLE, "model": MODEL_NAME,
-                "indexed_passages": len(self._passages), "error": self.load_error}
+                "indexed_passages": len(self._passages), "ready": self.ready(), "building": self._warming,
+                "error": self.load_error}
 
 
 semantic_index = SemanticIndex()
