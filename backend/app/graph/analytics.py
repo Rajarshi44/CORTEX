@@ -99,12 +99,23 @@ def actor_projection(D: nx.DiGraph) -> nx.Graph:
         elif rt in DIRECT_WEIGHTS and D.nodes[u]["type"] in ACTOR_TYPES and D.nodes[v]["type"] in ACTOR_TYPES:
             ch = "meetings" if rt == "MET" else "cases" if rt == "CO_ACCUSED" else "mentions" if rt == "MENTIONED_WITH" else "ties"
             bump(u, v, DIRECT_WEIGHTS[rt] * data["count"], rt.lower(), {ch: data["count"]} if ch in ("meetings", "cases", "mentions") else None)
+    # Parties to the same matter are connected in the record, whichever side they were on. Only
+    # ACCUSED_IN / MENTIONED_IN counted before, which left a corpus of court judgments - where the
+    # parties are petitioners and respondents - almost entirely unprojected.
+    CASE_PARTY = {"ACCUSED_IN", "MENTIONED_IN", "PETITIONER_IN", "RESPONDENT_IN", "COMPLAINANT_IN"}
     case_members: dict[str, set[str]] = defaultdict(set)
     for u, v, data in D.edges(data=True):
-        if data["rel_type"] in ("ACCUSED_IN", "MENTIONED_IN") and D.nodes[v]["type"] == "CASE" and D.nodes[u]["type"] in ACTOR_TYPES:
+        if data["rel_type"] in CASE_PARTY and D.nodes[v]["type"] == "CASE" and D.nodes[u]["type"] in ACTOR_TYPES:
+            # The State is a party to every criminal matter; linking co-parties through it would
+            # join thousands of unrelated people into one clique - the same false hub that an ISO
+            # country code used as an address created.
+            if is_non_subject(D.nodes[u]["type"], D.nodes[u]["label"], D.nodes[u].get("attrs") or {}):
+                continue
             case_members[v].add(u)
     for members in case_members.values():
         ms = sorted(members)
+        if len(ms) > 30:  # a case with a cast this large is a listing, not an association
+            continue
         for i in range(len(ms)):
             for j in range(i + 1, len(ms)):
                 bump(ms[i], ms[j], 1.0, "shared_case", {"cases": 1})
