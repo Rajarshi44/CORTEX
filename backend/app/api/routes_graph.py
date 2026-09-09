@@ -4,9 +4,11 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..auth import current_user
+from ..auth import current_user, require_role
 from ..db import TimelineEvent, User, get_session
 from ..graph import queries as Q
 from ..graph.analytics import actor_projection, removal_impact
@@ -111,9 +113,15 @@ def entities(db: Annotated[Session, Depends(get_session)], _: Annotated[User, De
             query = query.filter(Entity.type.in_(types))
         if roles:
             # as_string() rather than .astext: the column is a generic JSON, so this has to work on
-            # SQLite (local dev) as well as Postgres
-            expr = Entity.attributes["record_role"].as_string().in_(roles)
-            query = query.filter(~expr if exclude_roles else expr)
+            # SQLite (local dev) as well as Postgres.
+            role_col = Entity.attributes["record_role"].as_string()
+            if exclude_roles:
+                # Most entities carry no role at all, and `NOT (NULL IN (...))` is NULL rather than
+                # true - without the explicit null test, asking for "everything except judges" would
+                # return only the entities that happen to have some other role.
+                query = query.filter(or_(role_col.is_(None), role_col.notin_(roles)))
+            else:
+                query = query.filter(role_col.in_(roles))
         total = query.count()
         order = Entity.risk_score.desc() if sort == "priority" else Entity.mention_count.desc()
         query = query.order_by(order).offset(max(offset, 0))
@@ -136,7 +144,50 @@ def entity(eid: str, db: Annotated[Session, Depends(get_session)], _: Annotated[
         d["money"] = Q.money_flow(db, G, D, eid)
     if G.nodes[eid]["type"] in ("PERSON", "PHONE"):
         d["calls"] = Q.call_profile(db, G, D, eid)
+    from ..db import EntityNote
+    notes = db.query(EntityNote).filter(EntityNote.entity_id == eid).order_by(EntityNote.created_at.desc()).all()
+    d["notes"] = [{"id": n.id, "username": n.username, "text": n.text, "created_at": n.created_at.isoformat()} for n in notes]
     return d
+
+
+class NoteIn(BaseModel):
+    text: str
+
+@router.post("/entities/{eid}/notes", dependencies=[Depends(require_role("analyst"))])
+def add_entity_note(eid: str, body: NoteIn, db: Annotated[Session, Depends(get_session)], user: Annotated[User, Depends(current_user)]):
+    from ..db import EntityNote, Entity
+    if not db.get(Entity, eid):
+        raise HTTPException(404, "Entity not found")
+    note = EntityNote(entity_id=eid, username=user.username, text=body.text)
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return {"id": note.id, "username": note.username, "text": note.text, "created_at": note.created_at.isoformat()}
+
+@router.put("/entities/{eid}/notes/{note_id}", dependencies=[Depends(require_role("analyst"))])
+def update_entity_note(eid: str, note_id: int, body: NoteIn, db: Annotated[Session, Depends(get_session)], user: Annotated[User, Depends(current_user)]):
+    from ..db import EntityNote
+    note = db.get(EntityNote, note_id)
+    if not note or note.entity_id != eid:
+        raise HTTPException(404, "Note not found")
+    if note.username != user.username and user.role != "admin":
+        raise HTTPException(403, "Not authorized to edit this note")
+    note.text = body.text
+    db.commit()
+    db.refresh(note)
+    return {"id": note.id, "username": note.username, "text": note.text, "created_at": note.created_at.isoformat()}
+
+@router.delete("/entities/{eid}/notes/{note_id}", dependencies=[Depends(require_role("analyst"))])
+def delete_entity_note(eid: str, note_id: int, db: Annotated[Session, Depends(get_session)], user: Annotated[User, Depends(current_user)]):
+    from ..db import EntityNote
+    note = db.get(EntityNote, note_id)
+    if not note or note.entity_id != eid:
+        raise HTTPException(404, "Note not found")
+    if note.username != user.username and user.role != "admin":
+        raise HTTPException(403, "Not authorized to delete this note")
+    db.delete(note)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/entities/{eid}/ego")

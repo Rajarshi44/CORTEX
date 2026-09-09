@@ -127,8 +127,11 @@ def status_(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Dep
 
 @router.get("/documents")
 def documents(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)], source_type: str | None = None,
-              q: str | None = None, limit: int = 100):
+              q: str | None = None, entity_id: str | None = None, limit: int = 100):
     query = db.query(Document)
+    if entity_id:
+        from ..db import Evidence
+        query = query.join(Evidence, Evidence.document_id == Document.id).filter(Evidence.entity_id == entity_id).distinct()
     if source_type:
         query = query.filter(Document.source_type == source_type.upper())
     if q:

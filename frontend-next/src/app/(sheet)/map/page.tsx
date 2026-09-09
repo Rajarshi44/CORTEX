@@ -12,18 +12,23 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 const STYLE = "https://tiles.openfreemap.org/styles/positron";
-const KINDS = ["FIR", "SIGHTING", "CALL", "TRANSFER", "POST", "INTEL", "JUDGMENT"] as const;
 
 export default function MapLens() {
   const { data: geo } = useGeo();
   const { data: hist } = useHistogram();
-  const [kinds, setKinds] = useState<string[]>(["FIR", "SIGHTING", "TRANSFER", "CALL"]);
+  // Empty means every kind the sheet actually holds. The chips used to be a fixed list written
+  // for the synthetic case (FIR / SIGHTING / CALL / TRANSFER), which selected nothing at all on a
+  // corpus of judgments and news and left the map blank.
+  const [kinds, setKinds] = useState<string[]>([]);
   const timeWindow = useSheet((s) => s.timeWindow);
   const setTimeWindow = useSheet((s) => s.setTimeWindow);
   const select = useSheet((s) => s.select);
   const setNarrative = useSheet((s) => s.setNarrative);
   const presentation = useSheet((s) => s.presentation);
-  const { data: events } = useTimeline({ kinds, start: timeWindow?.[0], end: timeWindow?.[1], limit: 800, only_poi: true });
+  const availableKinds = geo?.kinds ?? [];
+  const { data: timelinePage } = useTimeline({ kinds: kinds.length ? kinds : undefined, start: timeWindow?.[0], end: timeWindow?.[1], limit: 800, only_poi: true });
+  const events = timelinePage?.items;
+  const eventsTotal = timelinePage?.total ?? 0;
   const mapRef = useRef<maplibregl.Map | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const markers = useRef<maplibregl.Marker[]>([]);
@@ -63,6 +68,14 @@ export default function MapLens() {
       }
     };
     if (map.isStyleLoaded()) paint(); else map.once("load", paint);
+    // Frame what the sheet actually covers. A fixed Mumbai viewport was right for the synthetic
+    // case and wrong for a corpus that spans the country.
+    if (geo.locations.length) {
+      const b = new maplibregl.LngLatBounds();
+      for (const l of geo.locations) b.extend([l.lon, l.lat]);
+      for (const e of geo.events) if (e.lat && e.lon) b.extend([e.lon, e.lat]);
+      map.fitBounds(b, { padding: 64, maxZoom: 9, animate: false });
+    }
   }, [geo, select, presentation]);
 
   // event pins for the current window
@@ -90,12 +103,12 @@ export default function MapLens() {
         <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-col gap-2">
           <div className="pointer-events-auto note-paper flex flex-wrap items-center gap-2 px-3 py-1.5">
             <span className="label label-ink">Events</span>
-            {KINDS.map((k) => <button key={k} type="button" aria-pressed={kinds.includes(k)} onClick={() => setKinds((s) => s.includes(k) ? s.filter((x) => x !== k) : [...s, k])} className={cn("label px-1.5 py-0.5", kinds.includes(k) ? "label-ink pencil-line" : "text-ink-faint hover:text-ink")}>{k}</button>)}
+            {availableKinds.map((k) => { const on = kinds.length === 0 || kinds.includes(k); return <button key={k} type="button" aria-pressed={on} onClick={() => setKinds((s) => s.includes(k) ? s.filter((x) => x !== k) : [...(s.length ? s : availableKinds.filter((x) => x !== k)), k].filter((x, i, a) => a.indexOf(x) === i))} className={cn("label px-1.5 py-0.5", on ? "label-ink pencil-line" : "text-ink-faint hover:text-ink")}>{k}</button>; })}
           </div>
           <Narrative />
         </div>
         <aside className="pointer-events-auto absolute right-3 top-3 z-10 hidden max-h-[60%] w-[22rem] flex-col note-paper lg:flex">
-          <h2 className="label label-ink border-b border-rule-strong px-3 py-1.5">Events in window · {events?.length ?? 0}</h2>
+          <h2 className="label label-ink border-b border-rule-strong px-3 py-1.5">Events in window · {events?.length ?? 0}{eventsTotal > (events?.length ?? 0) ? ` of ${eventsTotal}` : ""}</h2>
           <ol className="min-h-0 flex-1 overflow-y-auto">{listed.map((e) => <li key={e.id} className="border-b border-rule px-3 py-1 text-[var(--fs-note)]"><button type="button" onClick={() => { const a = e.actors?.[0]; if (a) select(a.id); }} className="block w-full text-left hover:text-pencil"><span className="figure text-ink-faint">{format(new Date(e.at), "dd MMM HH:mm")}</span> <span className="label text-ink-faint">{e.kind}</span><span className="block truncate text-ink">{e.summary}</span></button></li>)}</ol>
         </aside>
         <div className="pointer-events-none absolute bottom-3 right-3 z-10"><TitleBlock lens="Map" /></div>

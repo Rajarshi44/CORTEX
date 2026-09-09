@@ -34,6 +34,21 @@ BULK = "https://data.opensanctions.org/datasets/latest"
 PERSON_SCHEMAS = {"Person"}
 HONORIFIC = re.compile(r"^(mr|mrs|ms|miss|shri|smt|sh|dr|late|km|kumari)\.?\s", re.I)
 CORP_TOKEN = re.compile(r"\b(ltd|limited|inc|corp|corporation|llc|llp|pvt|private|gmbh|pte|plc|holdings?|trust|foundation|fund|company|co|securities|capital|finance|financial|investments?|enterprises?|industries|traders?|exports?|imports?|impex|associates|bank|group|services|solutions|technologies|infra\w*|realty|estates?|hospital|school|society|huf|firm)\b", re.I)
+
+
+# Relationship records in an FtM export. Each names the two entities it joins and the direction the
+# link runs, so a watchlist import becomes a network rather than a list of names.
+LINK_SCHEMAS: dict[str, tuple[str, str, str]] = {
+    "Directorship": ("director", "organization", "DIRECTOR_OF"),
+    "Ownership": ("owner", "asset", "OWNS"),
+    "Succession": ("predecessor", "successor", "SUCCEEDED_BY"),
+    "UnknownLink": ("subject", "object", "ASSOCIATE_OF"),
+    "Associate": ("person", "associate", "ASSOCIATE_OF"),
+    "Family": ("person", "relative", "RELATED_TO"),
+    "Employment": ("employee", "employer", "AFFILIATED_WITH"),
+    "Membership": ("member", "organization", "AFFILIATED_WITH"),
+    "Representation": ("agent", "client", "AFFILIATED_WITH"),
+}
 ORG_SCHEMAS = {"Company", "Organization", "LegalEntity", "PublicBody", "Airplane", "Vessel"}
 
 
@@ -124,22 +139,33 @@ class OpenSanctionsConnector(Connector):
         return name.title() if name.isupper() and len(name) > 3 else name
 
     def harvest(self, db: Session, dataset: str = "crime", limit: int = 1500, countries: list[str] | None = None,
-                scan: int = 200_000, **_) -> SourceReport:
+                scan: int = 200_000, link_closure: bool = True, max_closure: int = 4000, **_) -> SourceReport:
         """`countries` (ISO alpha-2, e.g. ["in"]) keeps only records tied to those countries; `scan` bounds how
         many records are read while filtering."""
         started = datetime.now(timezone.utc).isoformat()
         t0 = time.monotonic()
         rep = SourceReport(self.name, started_at=started)
+        # The export carries the network as well as the names: Directorship, Ownership, UnknownLink
+        # and Succession records join the listed entities to each other. They were dropped here,
+        # which is why every watchlist import landed as isolated points. They carry no country of
+        # their own, so they are collected past the country filter and kept only when both ends
+        # resolve to entities we actually imported.
+        links: list[dict] = []
         if countries:
             want = {c.lower() for c in countries}
             records = []
             for rec in self.stream_entities(dataset, scan):
+                if rec.get("schema") in LINK_SCHEMAS:
+                    links.append(rec)
+                    continue
                 if self._countries(rec) & want:
                     records.append(rec)
                     if len(records) >= limit:
                         break
         else:
-            records = list(self.stream_entities(dataset, limit))
+            records = []
+            for rec in self.stream_entities(dataset, limit):
+                (links if rec.get("schema") in LINK_SCHEMAS else records).append(rec)
         if not records:
             rep.status = "unavailable"
             rep.reason = f"dataset '{dataset}' unreachable or empty"
@@ -153,16 +179,21 @@ class OpenSanctionsConnector(Connector):
                        "", {"dataset": dataset, "source": "opensanctions"}, records=len(records))
         persons = orgs = wanted = 0
         referent_pairs = 0
+        # OpenSanctions id -> entity, so the relationship records can find both of their ends.
+        # Referents are alternative ids for the same entity, so they resolve to it too.
+        os_map: dict[str, object] = {}
 
-        for rec in records:
+        def import_rec(rec: dict) -> bool:
+            """Create or update one watchlist entity. Returns False for a record we do not model."""
+            nonlocal persons, orgs, wanted, referent_pairs
             f = self._fields(rec)
             if not f["caption"]:
-                continue
+                return False
             etype = PERSON if f["schema"] in PERSON_SCHEMAS else ORGANIZATION if f["schema"] in ORG_SCHEMAS else None
             if f["schema"] == "LegalEntity":  # Indian regulators list people and firms under one schema
                 etype = PERSON if HONORIFIC.match(f["caption"]) or (not CORP_TOKEN.search(f["caption"]) and 2 <= len(f["caption"].split()) <= 4) else ORGANIZATION
             if etype is None:
-                continue
+                return False
             topics = f["topics"]
             ent = svc.resolver.resolve(etype, self._tidy(HONORIFIC.sub("", f["caption"]).strip() if etype == PERSON else f["caption"]), {
                 "watchlist": True, "watchlist_topics": topics, "watchlist_datasets": f["datasets"],
@@ -175,6 +206,10 @@ class OpenSanctionsConnector(Connector):
                     + (f" | DOB {f['birth_date']}" if f["birth_date"] else "")
                     + (f" | born {f['birth_place']}" if f["birth_place"] else ""))
             add_entity_evidence(db, doc.id, ent.id, desc, 1.0, None, "structured")
+            if f["id"]:
+                os_map[f["id"]] = ent
+            for ref in f["referents"]:
+                os_map.setdefault(ref, ent)
             referent_pairs += len(f["referents"])
             if "wanted" in topics or "crime" in topics:
                 wanted += 1
@@ -193,16 +228,75 @@ class OpenSanctionsConnector(Connector):
                                   **({"country": named[0], "lat": named[1], "lon": named[2],
                                       "geo_precision": "country"} if named else {})}
                 db.add(ent)
+            return True
 
+        for rec in records:
+            import_rec(rec)
+
+        # Link closure. A relationship record only becomes an edge when both of its ends are on
+        # the sheet. Where one end is and the other is not, import the counterpart: the director
+        # of a listed company belongs here even though their own country field never said "IN".
+        closure = 0
+        if link_closure and links:
+            missing: set[str] = set()
+            for rec in links:
+                spec = LINK_SCHEMAS.get(rec.get("schema") or "")
+                if not spec:
+                    continue
+                props = rec.get("properties") or {}
+                for a in props.get(spec[0]) or []:
+                    for b in props.get(spec[1]) or []:
+                        if (a in os_map) != (b in os_map):
+                            missing.add(b if a in os_map else a)
+            if missing:
+                for rec in self.stream_entities(dataset, scan):
+                    if rec.get("id") in missing and import_rec(rec):
+                        closure += 1
+                        if closure >= max_closure:
+                            break
+
+        linked = self._apply_links(svc, doc.id, links, os_map)
         svc._finish()
         rep.records = persons + orgs
         rep.documents = 1
         rep.details = {"dataset": dataset, "countries": countries, "persons": persons, "organisations": orgs, "wanted_or_crime": wanted,
-                       "referent_links": referent_pairs}
+                       "referent_links": referent_pairs, "relationship_records": len(links), "relationships_linked": linked,
+                       "closure_entities": closure}
         rep.elapsed = round(time.monotonic() - t0, 2)
         return rep
 
     # ------------------------------------------------------------------ screening
+    @staticmethod
+    def _apply_links(svc: IngestionService, doc_id: str, links: list[dict], os_map: dict) -> int:
+        """
+        Turn FtM relationship records into edges between the entities we imported.
+
+        A link is kept only when both of its ends are entities already on the sheet: the export
+        describes the whole world, and an edge to something we never imported would be an assertion
+        we cannot show evidence for.
+        """
+        made = 0
+        for rec in links:
+            spec = LINK_SCHEMAS.get(rec.get("schema") or "")
+            if not spec:
+                continue
+            src_key, dst_key, rel = spec
+            props = rec.get("properties") or {}
+            for a in props.get(src_key) or []:
+                for b in props.get(dst_key) or []:
+                    src, dst = os_map.get(a), os_map.get(b)
+                    if src is None or dst is None or src.id == dst.id:
+                        continue
+                    role = (props.get("role") or [None])[0]
+                    svc.acc.add(src.id, dst.id, rel, weight=1.0, confidence=0.9, doc_id=doc_id,
+                                snippet=f"OpenSanctions {rec.get('schema')}: {src.label} -> {dst.label}"
+                                        + (f" ({role})" if role else ""),
+                                extractor="structured",
+                                attrs={"opensanctions_link": rec.get("id"), "schema": rec.get("schema"),
+                                       **({"role": role} if role else {})})
+                    made += 1
+        return made
+
     def screen(self, db: Session, threshold: int = 88, limit: int = 4000, datasets: list[str] | None = None) -> dict:
         """Match existing graph actors against one or more watchlists. Returns hits with scores."""
         from rapidfuzz import fuzz, process
