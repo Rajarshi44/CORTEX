@@ -1,0 +1,47 @@
+[project]
+name = "cna-backend"
+version = "1.0.0"
+description = "AI-Powered Criminal Network Analysis System - backend"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "networkx>=3.3",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "scipy>=1.13",
+    "rapidfuzz>=3.9",
+    "python-multipart>=0.0.9",
+    "pyjwt>=2.8",
+    "bcrypt>=4.1",
+    "httpx>=0.27",
+    "reportlab>=4.2",
+    "anthropic>=0.34",
+    "python-dateutil>=2.9",
+    # performance / analytics upgrades
+    "rustworkx>=0.18",
+    "polars>=1.30",
+    "duckdb>=1.3",
+    "pyod>=3.0",
+    "fastembed>=0.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "ruff>=0.5"]
+# zero-shot transformer NER (pulls PyTorch, ~2 GB). System is fully functional without it.
+neural = ["gliner>=0.2.20"]
+# browser-driven connectors for JS/postback portals (Maharashtra CCTNS). Run `playwright install chromium` after.
+browser = ["playwright>=1.50"]
+# production ASGI server alternative (Rust)
+fast = ["granian>=2.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 110

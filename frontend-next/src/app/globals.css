@@ -1,0 +1,206 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ the sheet
+   One world: a drafted link chart on drafting film. Every token below is an ink
+   or a material from that world; nothing is a generic UI grey.
+------------------------------------------------------------------------- */
+:root {
+  --film: #ededea;
+  --film-deep: #e4e3de;       /* margins, rails */
+  --film-lift: #f4f3ef;       /* raised note paper */
+  --rule: #dad9d3;
+  --rule-strong: #c4c3bb;
+  --ink: #1f1f1f;
+  --ink-soft: #5b5b57;
+  --ink-faint: #9a9a94;
+  --pencil: #b03a2e;
+  --pencil-soft: #d9a39c;
+  --pencil-wash: rgba(176, 58, 46, 0.08);
+  --blue: #3a5f8f;
+  --blue-soft: #9fb4cc;
+  --blue-wash: rgba(58, 95, 143, 0.08);
+  --amber: #b7791f;
+  --green: #4e7a47;
+
+  /* shadcn contract, mapped onto the film world */
+  --background: var(--film);
+  --foreground: var(--ink);
+  --card: var(--film-lift);
+  --card-foreground: var(--ink);
+  --popover: var(--film-lift);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--film);
+  --secondary: var(--film-deep);
+  --secondary-foreground: var(--ink);
+  --muted: var(--film-deep);
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--pencil-wash);
+  --accent-foreground: var(--pencil);
+  --destructive: var(--pencil);
+  --border: var(--rule);
+  --input: var(--rule-strong);
+  --ring: var(--pencil);
+  --chart-1: var(--ink);
+  --chart-2: var(--blue);
+  --chart-3: var(--pencil);
+  --chart-4: var(--amber);
+  --chart-5: var(--green);
+  --sidebar: var(--film-deep);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: var(--film);
+  --sidebar-accent: var(--pencil-wash);
+  --sidebar-accent-foreground: var(--pencil);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--pencil);
+  --radius: 2px;
+
+  /* type scale: fixed rem steps, ratio ~1.2 (Operate) */
+  --fs-note: 0.6875rem;   /* 11 */
+  --fs-label: 0.75rem;    /* 12 */
+  --fs-body: 0.8125rem;   /* 13 */
+  --fs-lead: 0.9375rem;   /* 15 */
+  --fs-title: 1.125rem;   /* 18 */
+  --fs-sheet: 1.75rem;    /* 28 */
+  --fs-monument: 3.5rem;  /* 56 */
+  --rail-w: 56px;
+  --notes-w: 380px;
+}
+
+/* presentation mode: larger type, thinner marginalia. Only scale changes. */
+.presentation {
+  --fs-note: 0.8125rem;
+  --fs-label: 0.875rem;
+  --fs-body: 1rem;
+  --fs-lead: 1.125rem;
+  --fs-title: 1.375rem;
+  --fs-sheet: 2.25rem;
+  --fs-monument: 4.5rem;
+  --notes-w: 440px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-film: var(--film);
+  --color-film-deep: var(--film-deep);
+  --color-film-lift: var(--film-lift);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-pencil: var(--pencil);
+  --color-pencil-soft: var(--pencil-soft);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-amber: var(--amber);
+  --color-green: var(--green);
+
+  --font-sans: var(--font-barlow), system-ui, sans-serif;
+  --font-condensed: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
+  --font-stencil: var(--font-stencil), var(--font-barlow-condensed), sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { color-scheme: light; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-size: var(--fs-body);
+    line-height: 1.45;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    overscroll-behavior: none;
+  }
+  ::selection { background: var(--pencil); color: var(--film); }
+  :focus-visible { outline: 2px solid var(--pencil); outline-offset: 2px; border-radius: 2px; }
+  /* the parts we did not draw still carry the world */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--film-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 3px solid var(--film-deep); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+  * { scrollbar-color: var(--rule-strong) var(--film-deep); scrollbar-width: thin; }
+  input, textarea { caret-color: var(--pencil); }
+  a { text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  /* the ruled sheet ground: faint drafting-film grid, reserved for chart and map areas */
+  .sheet-ground {
+    background-color: var(--film);
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--rule) 70%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--rule) 70%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: -1px -1px;
+  }
+  .sheet-plain { background-color: var(--film); }
+  .sheet-ground-fine {
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--rule) 55%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--rule) 55%, transparent) 1px, transparent 1px);
+    background-size: 8px 8px;
+  }
+  /* condensed stencil labels: the chart's own lettering */
+  .label { font-family: var(--font-condensed); font-size: var(--fs-label); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  .label-ink { color: var(--ink); }
+  .note { font-size: var(--fs-note); color: var(--ink-soft); }
+  .stencil { font-family: var(--font-stencil); letter-spacing: 0.04em; text-transform: uppercase; }
+  .figure { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1; }
+  /* margin note: a numbered entry on the sheet's edge */
+  .note-paper { background: var(--film-lift); box-shadow: 0 1px 0 var(--rule-strong), 0 6px 18px -10px rgba(31, 31, 31, 0.35); }
+  /* red pencil emphasis */
+  .pencil-line { box-shadow: inset 0 -2px 0 var(--pencil); }
+  .hairline { border-color: var(--rule-strong); }
+  .register-row { display: grid; grid-template-columns: 2.5rem 5.5rem 1fr 9rem 6rem; align-items: center; column-gap: 0.75rem; }
+  .register-row-p { grid-template-columns: 3rem 6.5rem 1fr 10rem 7rem; }
+}
+
+@keyframes ripple-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes draw { from { stroke-dashoffset: var(--len, 400); } to { stroke-dashoffset: 0; } }
+.ripple-in { animation: ripple-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
