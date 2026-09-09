@@ -19,9 +19,14 @@ from __future__ import annotations
 import re
 
 from .geo import COUNTRIES
-from .ner import LOCATION, ORGANIZATION, PERSON
+from .ner import BANK_ACCOUNT, GOV_ID, LOCATION, ORGANIZATION, PERSON, PHONE
 
 # --- 1. artifacts ------------------------------------------------------------------------------
+
+# Identifiers are legitimately all digits and carry no letters. A bare number is an artifact only
+# where a *name* was expected; rejecting it everywhere silently deleted every phone number, which
+# took call records, USES_PHONE links and the burner-phone detector with it.
+NUMERIC_TYPES = {PHONE, BANK_ACCOUNT, GOV_ID}
 
 # Bare ISO codes reaching entity resolution are always a connector leaking a field, never a place.
 ISO2 = set(COUNTRIES) | {"AF", "AL", "DZ", "AR", "AT", "AZ", "BH", "BY", "BG", "KH", "CL", "CO", "HR",
@@ -35,6 +40,64 @@ JUNK_LABELS = {
     "n/a", "na", "null", "none", "nil", "unknown", "not available", "not known", "-", "--", "...",
     "india", "other", "others", "misc", "miscellaneous", "same", "ditto", "do", "etc",
 }
+
+# A person mention must name somebody. Free-text extractors (and language models especially)
+# return descriptor phrases - "his cousin", "the accused", "one of them" - which are grammar
+# pointing at a person, not an identity. In these documents a real name is capitalised, so a
+# PERSON label with no capitalised token is a descriptor. Non-Latin scripts have no case, so
+# the rule only applies where ASCII letters are present.
+_LEADING_CUE_RE = re.compile(
+    r"^(?:the|a|an|one|his|her|their|its|my|our|your|another|other|said|above|same|this|that|"
+    r"co-?accused|accused|complainant|suspect|victim|deceased|witness|informant|applicant)\b\s*", re.I)
+_ASCII_LETTER_RE = re.compile(r"[A-Za-z]")
+_CAP_TOKEN_RE = re.compile(r"\b[A-Z][a-z'\u2019]+|\b[A-Z]{2,}\b")
+
+
+# Headline prose capitalises ordinary words, so a capitalised run is not yet a name. "Ban Ajit
+# Pawar", "Over Gulzar Singh" and "Vikram Mumbai Demolition" all arrived this way from news pages.
+# A token that is an ordinary English word, or a place, cannot be part of somebody's name here.
+NON_NAME_TOKENS = {
+    # sentence glue that leads a capitalised run
+    "a", "an", "the", "and", "or", "but", "as", "at", "by", "for", "from", "in", "into", "of", "on",
+    "over", "to", "with", "after", "amid", "before", "during", "under", "against", "between",
+    # headline verbs and nouns
+    "ban", "bans", "banned", "held", "hold", "says", "said", "seeks", "seek", "gets", "get", "row",
+    "case", "cases", "court", "police", "arrest", "arrested", "murder", "murdered", "death", "dead",
+    "killed", "attack", "probe", "raid", "bail", "fir", "chargesheet", "verdict", "hearing", "plea",
+    "demolition", "airbase", "airport", "station", "hospital", "school", "college", "university",
+    "minister", "chief", "president", "governor", "mayor", "commissioner", "officer", "inspector",
+    "report", "reports", "news", "video", "photos", "live", "updates", "exclusive", "opinion",
+    "today", "yesterday", "week", "month", "year", "day", "night", "morning", "evening",
+}
+
+
+def is_person_name(label: str) -> bool:
+    """True when a PERSON label plausibly names an individual rather than describing one.
+
+    Two independent failures are caught here. A descriptor ("his cousin") has no capitalised token
+    at all. A headline fragment ("Ban Ajit Pawar") is capitalised throughout but contains a word
+    that is not part of anybody's name. Both reached the graph from real corpora.
+    """
+    t = (label or "").strip()
+    if not t:
+        return False
+    if not _ASCII_LETTER_RE.search(t):
+        return True  # Devanagari and other caseless scripts: cannot judge by capitalisation
+    core = _LEADING_CUE_RE.sub("", t).strip()
+    if not core or not _CAP_TOKEN_RE.search(core):
+        return False
+    tokens = [tok.strip(".,'’").lower() for tok in core.split()]
+    tokens = [tok for tok in tokens if tok]
+    if not tokens:
+        return False
+    if any(tok in NON_NAME_TOKENS for tok in tokens):
+        return False
+    # a place inside a person's name means a headline ran two facts together
+    from .geo import CITIES, STATES
+
+    places = {p.lower() for p in CITIES} | {p.lower() for p in STATES}
+    return not any(tok in places for tok in tokens)
+
 
 _ONLY_PUNCT_RE = re.compile(r"^[\W_]+$")
 _ONLY_DIGITS_RE = re.compile(r"^\d+$")
@@ -56,16 +119,19 @@ def is_junk(etype: str, label: str) -> tuple[bool, str]:
         return True, f"stopword token '{t}'"
     if _ONLY_PUNCT_RE.match(t):
         return True, "punctuation only"
-    if _ONLY_DIGITS_RE.match(t):
-        return True, f"bare number '{t}'"
-    if not _HAS_LETTER_RE.search(t):
-        return True, "no letters"
+    if etype not in NUMERIC_TYPES:
+        if _ONLY_DIGITS_RE.match(t):
+            return True, f"bare number '{t}'"
+        if not _HAS_LETTER_RE.search(t):
+            return True, "no letters"
     # "IN" / "AE" as a place is a country code a connector forgot to expand.
     if etype == LOCATION and t.upper() in ISO2 and len(t) == 2:
         return True, f"ISO country code '{t.upper()}' used as a location"
     # A one or two character person/org name carries no identity.
     if etype in (PERSON, ORGANIZATION) and len(re.sub(r"\W", "", t)) < 3:
         return True, f"name too short '{t}'"
+    if etype == PERSON and not is_person_name(t):
+        return True, f"descriptor, not a name '{t}'"
     return False, ""
 
 

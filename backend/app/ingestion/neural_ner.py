@@ -72,11 +72,17 @@ def _valid(etype: str, span: str) -> bool:
         return 2 <= len(span) <= 120
     return True
 
-try:
-    from gliner import GLiNER
+# Imported only when the feature is on: `gliner` pulls transformers + torch (~1 GB resident),
+# which is far too much to pay for at startup when the default install runs rules-only.
+if settings.neural_ner_enabled:
+    try:
+        from gliner import GLiNER
 
-    GLINER_INSTALLED = True
-except ImportError:  # pragma: no cover
+        GLINER_INSTALLED = True
+    except ImportError:  # pragma: no cover
+        GLiNER = None
+        GLINER_INSTALLED = False
+else:  # pragma: no cover - trivial
     GLiNER = None
     GLINER_INSTALLED = False
 

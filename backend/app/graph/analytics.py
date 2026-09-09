@@ -129,7 +129,8 @@ def suspicion_signals(D: nx.DiGraph, anomaly_hits: dict[str, float] | None = Non
     """Evidence-based signals per actor, independent of graph structure."""
     sig: dict[str, dict] = defaultdict(lambda: {"accused": 0, "surveillance": 0, "intel": 0, "unverified": 0,
                                                 "international": 0, "anomaly": 0.0, "complainant": 0, "org_flag": None,
-                                                "watchlist": None, "wanted": 0, "convicted": 0, "offshore": 0})
+                                                "watchlist": None, "wanted": 0, "convicted": 0, "offshore": 0,
+                                                "press": 0})
     # public-record signals carried on the entity itself (watchlists, wanted notices, leaks)
     for n, a in D.nodes(data=True):
         at = a.get("attrs") or {}
@@ -160,7 +161,14 @@ def suspicion_signals(D: nx.DiGraph, anomaly_hits: dict[str, float] | None = Non
         elif rt == "SUBJECT_OF" and tv == "REPORT":
             sig[u]["surveillance"] += 1
         elif rt == "MENTIONED_IN" and tv == "REPORT" and "Surveillance" not in D.nodes[v]["label"]:
-            sig[u]["intel"] += 1
+            # An intelligence report names a subject; a newspaper names whoever the story is about,
+            # including victims, lawyers, ministers and film stars. Treating the two alike put
+            # Bollywood actors on the sheet as coordinators. Press coverage is context, not adverse
+            # record, so it carries no suspicion of its own.
+            if (D.nodes[v]["attrs"] or {}).get("source_type") == "NEWS":
+                sig[u]["press"] += 1
+            else:
+                sig[u]["intel"] += 1
         elif rt == "USES_PHONE":
             if d["attrs"].get("kyc_status") == "unverified" or D.nodes[v]["attrs"].get("kyc_status") == "unverified":
                 sig[u]["unverified"] += 1
@@ -205,6 +213,8 @@ def suspicion_signals(D: nx.DiGraph, anomaly_hits: dict[str, float] | None = Non
             reasons.append(f"subject of {s['surveillance']} surveillance report(s)")
         if s["intel"]:
             reasons.append(f"named in {s['intel']} intelligence report(s)")
+        if s["press"] and not any((s["accused"], s["intel"], s["watchlist"], s["wanted"])):
+            reasons.append(f"named in {s['press']} press report(s) - context only, not an adverse record")
         if s["unverified"]:
             reasons.append("uses phone with unverified KYC")
         if s["international"]:

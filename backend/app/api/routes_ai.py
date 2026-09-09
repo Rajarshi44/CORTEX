@@ -27,7 +27,8 @@ def status(_: Annotated[User, Depends(current_user)]):
         "extraction_tiers": {
             "rules": {"available": True, "description": "deterministic Indian-police regex + gazetteer"},
             "neural": neural_ner.status(),
-            "llm": {"available": llm.available(), "model": llm.settings.llm_model if llm.available() else None},
+            "llm": {**llm.status(), "extraction_enabled": llm.settings.llm_extraction_enabled,
+                    "model": llm.settings.llm_model if llm.available() else None},
         },
         "semantic_search": semantic_index.status(),
     }

@@ -99,7 +99,17 @@ class IngestionService:
         self.acc = RelationshipAccumulator()
         self.stats = IngestStats()
         self.gazetteer = self.ner.gazetteer
-        self.use_llm = settings.llm_enabled and bool(settings.anthropic_api_key) if use_llm is None else use_llm
+        # Per-document LLM extraction is opt-in and OFF by default even when a key is configured:
+        # one call costs tens of seconds, so a routine harvest of a few hundred documents would
+        # otherwise silently become hours. Narration and the investigator stay available on the same
+        # key; only this tier is gated. Pass use_llm=True, or set CNA_LLM_EXTRACTION_ENABLED, to run
+        # it over a corpus worth the wait.
+        if use_llm is None:
+            from ..ai.llm import available as _llm_available
+
+            self.use_llm = settings.llm_extraction_enabled and _llm_available()
+        else:
+            self.use_llm = use_llm
         if use_neural is None:
             from .neural_ner import neural_ner
 
@@ -181,6 +191,12 @@ class IngestionService:
         ents: dict[tuple[str, str], Any] = {}
         for m in res.mentions:
             attrs = {k: v for k, v in m.attrs.items() if k not in ("alias", "raw", "dictionary")}
+            # A name read out of prose must not silently become an existing watchlist or registry
+            # identity. "Ketan Agarwal" murdered in a Pune report is not the Ketan Agarwal on a US
+            # exclusions list, and merging them puts a sanctions listing on a victim. Tagging every
+            # text mention with one shared origin lets the resolver's cross-source guard split them
+            # while still merging the same name across two articles.
+            attrs.setdefault("source", "text")
             if m.type == LOCATION:
                 g = self.gazetteer.get(m.text) or {}
                 attrs.update({"lat": g.get("lat"), "lon": g.get("lon")})
@@ -223,9 +239,12 @@ class IngestionService:
 
         found = extract_ids(text, include_invalid=True)
         # person mentions with their position in the narrative, for ownership attribution
+        # Sort on the position alone. Two mentions can resolve to the same offset, and the tuple
+        # comparison then falls through to comparing Entity objects, which raises.
         person_positions = sorted(
-            (pos, e) for (t, txt), e in ents.items() if t == PERSON
-            for pos in [text.find(txt)] if pos >= 0
+            ((pos, e) for (t, txt), e in ents.items() if t == PERSON
+             for pos in [text.find(txt)] if pos >= 0),
+            key=lambda pair: pair[0],
         )
         for idf in found:
             if not idf.valid:

@@ -61,7 +61,16 @@ export interface Alert {
   evidence: Record<string, unknown>; created_at: string; entities: { id: string; label: string; type: EntityType }[];
 }
 
-export interface Evidence { snippet: string; confidence: number; at: string | null; extractor: Extractor; document_id: string; document_title: string; source_type: string }
+/**
+ * Where a row came from. The API resolves these (backend/app/ingestion/provenance.py);
+ * they are optional here so a panel still renders against an older build, falling back to
+ * `lib/provenance.ts`. A `source_url` of null means: real source, no public page to open.
+ */
+export interface Provenance { source_name?: string; source_url?: string | null; source_type?: string }
+
+export interface Evidence extends Provenance { snippet: string; confidence: number; at: string | null; extractor: Extractor; document_id: string; document_title: string; source_type: string }
+
+export interface DossierDocument extends Provenance { id: string; title: string; source_type: string; occurred_at?: string | null }
 
 export interface TimelineEvent { id: number; kind: string; at: string; summary: string; details: Record<string, unknown>; lat: number | null; lon: number | null; entity_ids: string[]; document_id: string; actors?: { id: string; label: string }[] }
 
@@ -74,7 +83,7 @@ export interface Dossier {
   timeline: TimelineEvent[];
   activity: [string, number][];
   removal_impact: RemovalImpact | null;
-  documents: { id: string; title: string; source_type: string }[];
+  documents: DossierDocument[];
   money?: { accounts: string[]; total_in: number; total_out: number; top_sources: [string, number][]; top_destinations: [string, number][]; transactions: { at: string; dir: "in" | "out"; counterparty: string; amount: number; mode: string; remarks: string }[] };
   calls?: { phones: string[]; total_calls: number; night_ratio: number; top_contacts: { phone: string; owner: string | null; owner_id: string | null; calls: number }[]; by_hour: number[] };
   notes?: Note[];

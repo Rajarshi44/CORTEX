@@ -59,6 +59,25 @@ def canonical_key(etype: str, text: str) -> str:
     return re.sub(r"\s+", " ", t).strip().lower()
 
 
+# Two people share a name and the sheet must show both. The suffix has to tell a reader which
+# record each one came from, so it is phrased the way an analyst would say it out loud.
+SOURCE_QUALIFIER = {
+    "text": "named in reports",
+    "OpenSanctions": "watchlist",
+    "ICIJ": "offshore leaks",
+    "eCourts": "court record",
+    "GLEIF": "company registry",
+    "wanted-list": "wanted notice",
+    "address-fold": "address",
+}
+
+
+def _qualifier(source: str | None) -> str | None:
+    if not source:
+        return None
+    return SOURCE_QUALIFIER.get(source, str(source))
+
+
 class EntityResolver:
     def __init__(self, db: Session):
         self.db = db
@@ -140,7 +159,7 @@ class EntityResolver:
         if ent is None:
             label = self._display_label(etype, text)
             if "#" in key:
-                label = f"{label} ({attrs.get('source') or key.rsplit('#', 1)[1]})"
+                label = f"{label} ({_qualifier(attrs.get('source')) or key.rsplit('#', 1)[1]})"
             ent = Entity(id=str(uuid.uuid4()), type=etype, label=label, canonical_key=key,
                          aliases=[], attributes={}, mention_count=0, first_seen=None, last_seen=None)
             self.db.add(ent)

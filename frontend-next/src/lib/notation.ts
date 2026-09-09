@@ -3,6 +3,7 @@
  * entity type off the shape and evidence grade off the line, exactly as on a
  * hand-drafted chart. Nothing decorative lives here; every mark means one thing.
  */
+import { format } from "date-fns";
 import type { EntityType, Extractor } from "./types";
 
 export const INK = {
@@ -104,3 +105,107 @@ export function refCode(type: EntityType, index: number): string {
 
 export const fmtInr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 export const fmtNum = (n: number, d = 2) => Number.isInteger(n) ? n.toLocaleString("en-IN") : n.toFixed(d);
+
+/* ------------------------------------------------------------------ properties
+   An entity's recorded properties come off the wire as whatever the source called
+   them. They are read by a person, so a key becomes a phrase and a value becomes a
+   sentence fragment: never a raw JSON blob, never a snake_case key on the sheet.
+--------------------------------------------------------------------------- */
+
+/** Words that are read as letters, not capitalised as words. */
+const ACRONYM: Record<string, string> = {
+  id: "ID", ids: "IDs", url: "URL", uri: "URI", lei: "LEI", isin: "ISIN", icij: "ICIJ", nia: "NIA", mha: "MHA",
+  sebi: "SEBI", nse: "NSE", bse: "BSE", uapa: "UAPA", pan: "PAN", gstin: "GSTIN", ifsc: "IFSC", imei: "IMEI",
+  imsi: "IMSI", cnr: "CNR", fir: "FIR", cdr: "CDR", kyc: "KYC", ip: "IP", pep: "PEP", ncrb: "NCRB", cctns: "CCTNS",
+  usd: "USD", inr: "INR", ocr: "OCR", pdf: "PDF", api: "API", sc: "SC", hc: "HC",
+};
+
+/** Keys whose natural phrasing is not a simple de-underscoring. */
+const ATTR_LABEL: Record<string, string> = {
+  lat: "Latitude", lon: "Longitude", opensanctions_id: "OpenSanctions ID", icij_type: "ICIJ record type",
+  icij_node_id: "ICIJ node ID", sourceID: "ICIJ source file", screened_match: "Screened against watchlist",
+  screen_score: "Screen match score", screen_strength: "Screen match strength", watchlist_datasets: "Watchlist datasets",
+  watchlist_topics: "Watchlist topics", referent_count: "Linked list entries", record_role: "Role in record",
+  court_role: "Role in court record", wanted_notice: "Wanted notice", valid_until: "Record valid until",
+  jurisdiction_description: "Jurisdiction", incorporation_date: "Incorporated on", birth_date: "Date of birth",
+};
+
+/** snake_case, camelCase or SCREAMING_CASE to a sentence a person reads. */
+export function humaniseKey(key: string): string {
+  if (ATTR_LABEL[key]) return ATTR_LABEL[key];
+  const words = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/[_\s.-]+/).filter(Boolean);
+  if (!words.length) return key;
+  return words
+    .map((w, i) => {
+      const a = ACRONYM[w.toLowerCase()];
+      if (a) return a;
+      const lower = w.toLowerCase();
+      return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+    })
+    .join(" ");
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}|$)/;
+/** Keys whose numbers are labels, not quantities: an ID is never written 1,01,27,533. */
+const IDENTIFIER_KEY = /(^|_)(id|ids|no|num|number|code|pin|lei|imei|imsi|isin|cnr|year|account|phone)$/i;
+
+/** One scalar, formatted the way the sheet writes it: Yes/No, 12 Mar 2024, grouped figures. */
+export function formatAttrScalar(v: unknown, key?: string): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "number") {
+    if (!Number.isFinite(v)) return "";
+    if (key && IDENTIFIER_KEY.test(key)) return String(v);
+    return Number.isInteger(v) ? v.toLocaleString("en-IN") : String(Number(v.toFixed(4)));
+  }
+  const s = String(v).trim();
+  if (ISO_DATE.test(s)) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return format(d, "dd MMM yyyy");
+  }
+  return s;
+}
+
+/** Any recorded value as prose: lists become comma lists, nested records become "key: value" pairs. */
+export function formatAttrValue(v: unknown, key?: string): string {
+  if (Array.isArray(v)) return v.map((x) => formatAttrValue(x, key)).filter(Boolean).join(", ");
+  if (v && typeof v === "object") {
+    return Object.entries(v as Record<string, unknown>)
+      .filter(([, x]) => !isEmptyAttr(x))
+      .map(([k, x]) => `${humaniseKey(k)}: ${formatAttrValue(x, k)}`)
+      .join(" · ");
+  }
+  return formatAttrScalar(v, key);
+}
+
+/** A property with nothing in it is not printed: a blank row says nothing and costs a line. */
+export function isEmptyAttr(v: unknown): boolean {
+  if (v === null || v === undefined || v === "") return true;
+  if (Array.isArray(v)) return v.length === 0 || v.every(isEmptyAttr);
+  if (typeof v === "object") return Object.keys(v as object).length === 0;
+  if (typeof v === "number") return !Number.isFinite(v);
+  return String(v).trim() === "";
+}
+
+/** Every non-empty recorded property, humanised, in the order the source recorded it. */
+export function attrRows(attrs: Record<string, unknown> | null | undefined): { key: string; label: string; value: string; href: string | null }[] {
+  return Object.entries(attrs ?? {})
+    .filter(([, v]) => !isEmptyAttr(v))
+    .map(([k, v]) => {
+      const value = formatAttrValue(v, k);
+      return { key: k, label: humaniseKey(k), value, href: /^https?:\/\/\S+$/i.test(value) ? value : null };
+    })
+    .filter((r) => r.value !== "");
+}
+
+/** "12 Mar 2024 – 4 Apr 2024", or a single date, or nothing at all. */
+export function dateSpan(first?: string | null, last?: string | null): string {
+  const fmt = (s?: string | null) => {
+    if (!s) return null;
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : format(d, "dd MMM yyyy");
+  };
+  const a = fmt(first), b = fmt(last);
+  if (a && b) return a === b ? a : `${a} – ${b}`;
+  return a ?? b ?? "";
+}

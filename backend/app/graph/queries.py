@@ -12,6 +12,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..db import Alert, Document, Entity, Evidence, TimelineEvent
+from ..ingestion import provenance
 
 REL_VERB = {
     "CALLED": "called", "TRANSFERRED_TO": "transferred money to", "USES_PHONE": "uses phone", "OWNS_ACCOUNT": "holds account",
@@ -171,7 +172,8 @@ def entity_dossier(db: Session, G: nx.Graph, D: nx.DiGraph, snapshot: dict, eid:
                 assoc.append({"other": node_view(G, other, snapshot), **{k: v for k, v in e.items() if k not in ("source", "target")}})
     assoc.sort(key=lambda a: -a["weight"])
     evidence = [{"snippet": ev.snippet, "confidence": ev.confidence, "at": ev.occurred_at.isoformat() if ev.occurred_at else None,
-                 "extractor": ev.extractor, "document_id": ev.document_id, "document_title": ev.document.title, "source_type": ev.document.source_type}
+                 "extractor": ev.extractor, "document_id": ev.document_id, "document_title": ev.document.title,
+                 **provenance.describe(ev.document)}
                 for ev in db.query(Evidence).filter(Evidence.entity_id == eid).order_by(Evidence.occurred_at).limit(60).all()]
     alerts = [{"id": a.id, "kind": a.kind, "severity": a.severity, "title": a.title, "score": a.score, "status": a.status}
               for a in db.query(Alert).order_by(Alert.score.desc()).all() if eid in (a.entity_ids or [])]
@@ -184,7 +186,8 @@ def entity_dossier(db: Session, G: nx.Graph, D: nx.DiGraph, snapshot: dict, eid:
     impact = snapshot.get("removal_impact", {}).get(eid)
     return {"entity": nv, "relationships": dict(rels), "associates": assoc[:40], "evidence": evidence, "alerts": alerts,
             "timeline": timeline[-120:], "activity": sorted(weeks.items()), "removal_impact": impact,
-            "documents": [{"id": d.id, "title": d.title, "source_type": d.source_type} for d in
+            "documents": [{"id": d.id, "title": d.title, "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None,
+                           **provenance.describe(d)} for d in
                           db.query(Document).filter(Document.id.in_({e["document_id"] for e in evidence} | {t["document_id"] for t in timeline})).limit(50).all()]}
 
 
