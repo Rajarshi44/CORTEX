@@ -139,7 +139,7 @@ class OpenSanctionsConnector(Connector):
         return name.title() if name.isupper() and len(name) > 3 else name
 
     def harvest(self, db: Session, dataset: str = "crime", limit: int = 1500, countries: list[str] | None = None,
-                scan: int = 200_000, **_) -> SourceReport:
+                scan: int = 200_000, link_closure: bool = True, max_closure: int = 4000, **_) -> SourceReport:
         """`countries` (ISO alpha-2, e.g. ["in"]) keeps only records tied to those countries; `scan` bounds how
         many records are read while filtering."""
         started = datetime.now(timezone.utc).isoformat()
@@ -183,15 +183,17 @@ class OpenSanctionsConnector(Connector):
         # Referents are alternative ids for the same entity, so they resolve to it too.
         os_map: dict[str, object] = {}
 
-        for rec in records:
+        def import_rec(rec: dict) -> bool:
+            """Create or update one watchlist entity. Returns False for a record we do not model."""
+            nonlocal persons, orgs, wanted, referent_pairs
             f = self._fields(rec)
             if not f["caption"]:
-                continue
+                return False
             etype = PERSON if f["schema"] in PERSON_SCHEMAS else ORGANIZATION if f["schema"] in ORG_SCHEMAS else None
             if f["schema"] == "LegalEntity":  # Indian regulators list people and firms under one schema
                 etype = PERSON if HONORIFIC.match(f["caption"]) or (not CORP_TOKEN.search(f["caption"]) and 2 <= len(f["caption"].split()) <= 4) else ORGANIZATION
             if etype is None:
-                continue
+                return False
             topics = f["topics"]
             ent = svc.resolver.resolve(etype, self._tidy(HONORIFIC.sub("", f["caption"]).strip() if etype == PERSON else f["caption"]), {
                 "watchlist": True, "watchlist_topics": topics, "watchlist_datasets": f["datasets"],
@@ -226,13 +228,40 @@ class OpenSanctionsConnector(Connector):
                                   **({"country": named[0], "lat": named[1], "lon": named[2],
                                       "geo_precision": "country"} if named else {})}
                 db.add(ent)
+            return True
+
+        for rec in records:
+            import_rec(rec)
+
+        # Link closure. A relationship record only becomes an edge when both of its ends are on
+        # the sheet. Where one end is and the other is not, import the counterpart: the director
+        # of a listed company belongs here even though their own country field never said "IN".
+        closure = 0
+        if link_closure and links:
+            missing: set[str] = set()
+            for rec in links:
+                spec = LINK_SCHEMAS.get(rec.get("schema") or "")
+                if not spec:
+                    continue
+                props = rec.get("properties") or {}
+                for a in props.get(spec[0]) or []:
+                    for b in props.get(spec[1]) or []:
+                        if (a in os_map) != (b in os_map):
+                            missing.add(b if a in os_map else a)
+            if missing:
+                for rec in self.stream_entities(dataset, scan):
+                    if rec.get("id") in missing and import_rec(rec):
+                        closure += 1
+                        if closure >= max_closure:
+                            break
 
         linked = self._apply_links(svc, doc.id, links, os_map)
         svc._finish()
         rep.records = persons + orgs
         rep.documents = 1
         rep.details = {"dataset": dataset, "countries": countries, "persons": persons, "organisations": orgs, "wanted_or_crime": wanted,
-                       "referent_links": referent_pairs, "relationship_records": len(links), "relationships_linked": linked}
+                       "referent_links": referent_pairs, "relationship_records": len(links), "relationships_linked": linked,
+                       "closure_entities": closure}
         rep.elapsed = round(time.monotonic() - t0, 2)
         return rep
 

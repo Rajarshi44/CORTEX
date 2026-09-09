@@ -1,6 +1,6 @@
 import type {
   AiStatus, Alert, AlertStatus, AssistantAnswer, Community, DocumentDetail, DocumentSummary, Dossier, GeoPayload,
-  GraphPayload, IngestStatus, KeyPlayer, Broker, LedgerVerify, LinkPrediction, LinkageReport, NodeView, PathHop,
+  EntityPage, GraphPayload, IngestStatus, KeyPlayer, Broker, LedgerVerify, LinkPrediction, LinkageReport, NodeView, PathHop,
   RemovalImpact, SourceInfo, SourceReport, Summary, TimelineEvent, User, SheetIdentity,
 } from "./types";
 

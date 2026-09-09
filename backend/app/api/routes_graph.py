@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..auth import current_user
@@ -111,9 +112,15 @@ def entities(db: Annotated[Session, Depends(get_session)], _: Annotated[User, De
             query = query.filter(Entity.type.in_(types))
         if roles:
             # as_string() rather than .astext: the column is a generic JSON, so this has to work on
-            # SQLite (local dev) as well as Postgres
-            expr = Entity.attributes["record_role"].as_string().in_(roles)
-            query = query.filter(~expr if exclude_roles else expr)
+            # SQLite (local dev) as well as Postgres.
+            role_col = Entity.attributes["record_role"].as_string()
+            if exclude_roles:
+                # Most entities carry no role at all, and `NOT (NULL IN (...))` is NULL rather than
+                # true - without the explicit null test, asking for "everything except judges" would
+                # return only the entities that happen to have some other role.
+                query = query.filter(or_(role_col.is_(None), role_col.notin_(roles)))
+            else:
+                query = query.filter(role_col.in_(roles))
         total = query.count()
         order = Entity.risk_score.desc() if sort == "priority" else Entity.mention_count.desc()
         query = query.order_by(order).offset(max(offset, 0))
