@@ -1,0 +1,25 @@
+event_id,event_date,event_time,event_type,description,location_city,location_state,linked_entity_ids,sub_network,severity,source_document
+EV-001,2026-03-15,10:00,COMPLAINT_FILED,Earlier NCRP complaint filed regarding similar fraud,Unknown,Unknown,,SN-A,LOW,NCRP-01
+EV-002,2026-06-22,14:30,COMPLAINT_FILED,Another earlier NCRP complaint filed,Unknown,Unknown,,SN-A,LOW,NCRP-02
+EV-003,2026-10-05,11:15,ACCOUNT_OPENED,CyberHawk mule accounts opened by students,Delhi,Delhi,"P006;P007",SN-B,MEDIUM,DOC-005
+EV-004,2026-11-05,10:30,FRAUD_COMMITTED,Victim P001 receives WhatsApp call starting digital arrest scam,Delhi,Delhi,P001,SN-A,HIGH,DOC-001
+EV-005,2026-11-15,12:45,MONEY_TRANSFER,Money transfers from victim to NGO account,Delhi,Delhi,"P001;P004",SN-A,CRITICAL,DOC-001
+EV-006,2026-11-20,08:00,SURVEILLANCE,IFSO surveillance of Dwarka hotel begins,Delhi,Delhi,,SN-C,MEDIUM,DOC-009
+EV-007,2026-11-21,09:00,MONEY_TRANSFER,"Burst transactions start (10,000+ through A006)",Delhi,Delhi,,SN-C,CRITICAL,DOC-015
+EV-008,2026-11-25,18:00,SURVEILLANCE,IFSO surveillance of Dwarka hotel ends,Delhi,Delhi,,SN-C,MEDIUM,DOC-009
+EV-009,2026-11-26,06:00,RAID,Dwarka hotel raid with 4 initial arrests,Delhi,Delhi,"P008;P009;P010;P011",SN-C,HIGH,DOC-008
+EV-010,2026-11-28,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P012,SN-C,MEDIUM,DOC-010
+EV-011,2026-11-30,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P013,SN-C,MEDIUM,DOC-011
+EV-012,2026-12-01,10:00,COMPLAINT_FILED,P001 files formal complaint,Delhi,Delhi,P001,SN-A,MEDIUM,DOC-001
+EV-013,2026-12-02,11:00,ARREST,CyberHawk arrests P006 and P007,Delhi,Delhi,"P006;P007",SN-B,MEDIUM,DOC-006
+EV-014,2026-12-03,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P014,SN-C,MEDIUM,DOC-012
+EV-015,2026-12-04,10:00,INTELLIGENCE_ALERT,Investigation traces money to NGO account,Delhi,Delhi,P004,SN-A,HIGH,DOC-001
+EV-016,2026-12-05,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P015,SN-C,MEDIUM,DOC-013
+EV-017,2026-12-05,16:00,ARREST,Arrest of P002 (caller),Nalanda,Bihar,P002,SN-A,HIGH,DOC-002
+EV-018,2026-12-06,10:00,ARREST,Arrest of P003 (recruiter),Vaishali,Bihar,P003,SN-A,HIGH,DOC-003
+EV-019,2026-12-07,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P016,SN-C,MEDIUM,DOC-014
+EV-020,2026-12-08,12:00,ARREST,Arrest of P004 (NGO operator),Sirmaur,Himachal Pradesh,P004,SN-A,HIGH,DOC-004
+EV-021,2026-12-09,15:00,DEVICE_SEIZED,Forensic report on seized devices completed,Delhi,Delhi,,SN-C,MEDIUM,DOC-015
+EV-022,2026-12-10,09:00,INTELLIGENCE_ALERT,"Cross-network analysis connects SN-A, SN-B, SN-C",Delhi,Delhi,,ALL,HIGH,DOC-016
+EV-023,2026-12-13,11:00,INTELLIGENCE_ALERT,Press announcement by Delhi Police Crime Branch,Delhi,Delhi,,ALL,LOW,PRESS-01
+EV-024,2026-12-14,09:00,INTELLIGENCE_ALERT,P005 Rahul alias Happy still at large,Delhi,Delhi,P005,SN-B,MEDIUM,PRESS-01

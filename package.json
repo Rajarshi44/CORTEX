@@ -1,0 +1,16 @@
+{
+  "name": "batcave",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:demo": "concurrently \"npm run dev:demo:backend\" \"npm run dev:demo:frontend\"",
+    "dev:frontend": "cd frontend-next && npm run dev",
+    "dev:demo:frontend": "cd frontend-next && cross-env NEXT_PUBLIC_API_URL=http://localhost:8001 npm run dev -- -p 3001",
+    "dev:backend": "cd backend && .\\venv\\Scripts\\python -m uvicorn app.main:app --reload",
+    "dev:demo:backend": "cd backend && cross-env CNA_DATABASE_URL=sqlite:///./demo.db CNA_DEFAULT_CORPUS=none .\\venv\\Scripts\\python -m app.ingestion.load_demo_case && cross-env CNA_DATABASE_URL=sqlite:///./demo.db CNA_DEFAULT_CORPUS=none .\\venv\\Scripts\\python -m uvicorn app.main:app --port 8001"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3"
+  }
+}
