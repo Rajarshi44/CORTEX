@@ -116,6 +116,17 @@ def geo(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends
         locs.append({"id": n, "label": d["label"], "lat": d["attrs"]["lat"], "lon": d["attrs"]["lon"], "degree": G.degree(n),
                      "actors": len(actors), "poi": [{"id": a, "label": G.nodes[a]["label"]} for a in sorted(poi, key=lambda a: -susp[a]["score"])[:6]],
                      "risk": round(sum(susp.get(a, {}).get("score", 0) for a in actors) / max(len(actors), 1), 3)})
-    events = [{"id": e.id, "kind": e.kind, "at": e.occurred_at.isoformat(), "summary": e.summary, "lat": e.lat, "lon": e.lon}
-              for e in db.query(TimelineEvent).filter(TimelineEvent.lat.isnot(None), TimelineEvent.kind.in_(["SIGHTING", "FIR", "POST"])).all()]
-    return {"locations": locs, "events": events}
+    # Every geo-tagged event, whatever its kind. The previous hard-coded ("SIGHTING", "FIR", "POST")
+    # filter was written for the synthetic case and silently emptied the map for the public-record
+    # corpus, whose events are JUDGMENT and NEWS. Kinds come from the data, not from a list here.
+    rows = db.query(TimelineEvent).filter(TimelineEvent.lat.isnot(None)).order_by(TimelineEvent.occurred_at).all()
+    events = [{"id": e.id, "kind": e.kind, "at": e.occurred_at.isoformat(), "summary": e.summary,
+               "lat": e.lat, "lon": e.lon, "document_id": e.document_id, "entity_ids": e.entity_ids or [],
+               # how precisely we actually know the place, so the map never implies a street address
+               "precision": ((e.details or {}).get("geo") or {}).get("precision"),
+               "placed_at": ((e.details or {}).get("geo") or {}).get("matched")}
+              for e in rows]
+    return {"locations": locs, "events": events,
+            "kinds": sorted({e["kind"] for e in events}),
+            "meta": {"events": len(events), "locations": len(locs),
+                     "events_total": db.query(TimelineEvent).count()}}

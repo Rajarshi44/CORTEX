@@ -24,6 +24,7 @@ from typing import Any
 import networkx as nx
 import numpy as np
 
+from ..ingestion.quality import is_non_subject
 from . import fastmetrics
 
 ACTOR_TYPES = {"PERSON", "ORGANIZATION"}
@@ -121,7 +122,9 @@ def suspicion_signals(D: nx.DiGraph, anomaly_hits: dict[str, float] | None = Non
     # public-record signals carried on the entity itself (watchlists, wanted notices, leaks)
     for n, a in D.nodes(data=True):
         at = a.get("attrs") or {}
-        if at.get("court_role") == "judge":
+        # The machinery of a case is not a subject of it: the judge who decided it, the State it was
+        # brought against, the court or agency that handled it. None of them carry suspicion.
+        if is_non_subject(a.get("type", ""), a.get("label", ""), at):
             continue
         if at.get("watchlist"):
             topics = at.get("watchlist_topics") or []
@@ -409,8 +412,11 @@ def summarize_communities(P: nx.Graph, D: nx.DiGraph, community: dict[str, int],
 def key_players(P: nx.Graph, metrics: dict, roles: dict, community: dict, priority: dict, susp: dict, top: int = 10) -> list[dict]:
     ranked = sorted(priority.items(), key=lambda kv: -kv[1])
     out = []
-    # a name with no ties is a record, not a player: the list is about position in the network
-    ranked = [(n, p) for n, p in ranked if metrics[n]["degree"] > 0 and (P.nodes[n].get("attrs") or {}).get("court_role") != "judge"]
+    # a name with no ties is a record, not a player; and a judge, the State or a court is the
+    # machinery of the case rather than a player in it
+    ranked = [(n, p) for n, p in ranked
+              if metrics[n]["degree"] > 0
+              and not is_non_subject(P.nodes[n].get("type", ""), P.nodes[n].get("label", ""), P.nodes[n].get("attrs") or {})]
     for n, p in ranked[:top]:
         r = roles.get(n, {})
         s = susp.get(n, {})

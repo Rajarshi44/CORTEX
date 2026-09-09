@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from ..ingestion import geo
 from ..ingestion.ner import ORGANIZATION, PERSON
 from ..ingestion.pipeline import IngestionService
 from .base import Connector, SourceReport, register
@@ -182,9 +183,16 @@ class OpenSanctionsConnector(Connector):
             else:
                 orgs += 1
             if f["country"]:
-                loc = svc._loc(str(f["country"]).upper())
-                svc.acc.add(ent.id, loc.id, "RESIDES_AT", weight=0.4, confidence=0.5, doc_id=doc.id,
-                            snippet=f"Watchlist country: {f['country']}", extractor="structured")
+                # A watchlist gives a country of listing, not an address. Making it a LOCATION node
+                # and hanging RESIDES_AT off it invented a hub that every listed person shared -
+                # 305 people "residing at" the entity "IN" - which the co-location rules then read
+                # as a real association. It belongs on the entity as an attribute.
+                code = str(f["country"]).upper()
+                named = geo.country_of(code)
+                ent.attributes = {**ent.attributes, "country_code": code,
+                                  **({"country": named[0], "lat": named[1], "lon": named[2],
+                                      "geo_precision": "country"} if named else {})}
+                db.add(ent)
 
         svc._finish()
         rep.records = persons + orgs

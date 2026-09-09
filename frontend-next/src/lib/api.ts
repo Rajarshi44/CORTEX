@@ -72,7 +72,9 @@ export const api = {
   projection: (p: { min_weight?: number; only_poi?: boolean } = {}) =>
     request<{ nodes: NodeView[]; edges: { source: string; target: string; weight: number; channels: Record<string, number>; calls: number; night_calls: number; amount: number; meetings: number; cases: number }[] }>(`/api/graph/projection${qs(p)}`),
   path: (src: string, dst: string, k = 3) => request<{ paths: PathHop[][]; subgraph: GraphPayload }>(`/api/graph/path${qs({ src, dst, k })}`),
-  entities: (p: { q?: string; types?: string[]; sort?: string; limit?: number } = {}) => request<NodeView[]>(`/api/entities${qs(p)}`),
+  // `limit: 0` asks for every row; `total` is the unpaged count so a view can say what it is not showing.
+  entities: (p: { q?: string; types?: string[]; sort?: string; limit?: number; offset?: number; roles?: string[]; exclude_roles?: boolean } = {}) =>
+    request<EntityPage>(`/api/entities${qs(p)}`),
   entity: (id: string) => request<Dossier>(`/api/entities/${id}`),
   ego: (id: string, depth = 1, limit = 120) => request<GraphPayload>(`/api/entities/${id}/ego${qs({ depth, limit })}`),
 
@@ -84,8 +86,9 @@ export const api = {
   linkPredictions: () => request<LinkPrediction[]>("/api/analytics/link-predictions"),
   impact: (id: string) => request<RemovalImpact>(`/api/analytics/impact/${id}`),
   recompute: () => request<Record<string, unknown>>("/api/analytics/recompute", { method: "POST" }),
+  // `limit: 0` returns every matching event; `total` counts the matches a cap would hide.
   timeline: (p: { kinds?: string[]; entity?: string; start?: string; end?: string; limit?: number; only_poi?: boolean } = {}) =>
-    request<TimelineEvent[]>(`/api/timeline${qs(p)}`),
+    request<{ items: TimelineEvent[]; total: number; returned: number; limit: number; complete: boolean }>(`/api/timeline${qs(p)}`),
   histogram: (bucket: "day" | "month" = "day", only_poi = true) => request<Record<string, number | string>[]>(`/api/timeline/histogram${qs({ bucket, only_poi })}`),
   geo: () => request<GeoPayload>("/api/geo"),
 

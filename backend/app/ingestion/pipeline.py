@@ -26,9 +26,10 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..db import AnalysisSnapshot, Document
 from ..graph.store import RelationshipAccumulator, add_entity_evidence, add_event, graph_cache
+from . import geo
 from .ner import (BANK_ACCOUNT, CASE, GOV_ID, LOCATION, ORGANIZATION, PERSON, PHONE, REPORT, SOCIAL_HANDLE,
                   VEHICLE, ExtractionResult, RuleNER)
-from .resolution import EntityResolver
+from .resolution import EntityResolver, JunkMention
 
 log = logging.getLogger("cna.ingest")
 
@@ -129,8 +130,33 @@ class IngestionService:
         return d
 
     def _loc(self, name: str, seen: datetime | None = None):
+        """
+        Resolve a place, geocoding it where we can. Returns None for a mention that is not a place
+        at all (a stopword, a bare ISO country code) so the caller drops the link rather than
+        hanging it off an entity with no evidence behind it.
+        """
         g = self.gazetteer.get(name) or {}
-        return self.resolver.resolve(LOCATION, name, {"lat": g.get("lat"), "lon": g.get("lon")}, seen)
+        attrs: dict = {"lat": g.get("lat"), "lon": g.get("lon")}
+        if attrs["lat"] is None:  # not a bundled neighbourhood - try the wider gazetteer
+            hit = geo.locate(name)
+            if hit:
+                attrs = {"lat": hit["lat"], "lon": hit["lon"], "geo_precision": hit["precision"],
+                         "geo_matched": hit["matched"]}
+        return self.resolver.resolve_opt(LOCATION, name, attrs, seen)
+
+    @staticmethod
+    def _event_point(source_type: str, title: str, text: str, meta: dict) -> dict | None:
+        """
+        Where a document-level event happened, in the terms each source actually gives us.
+
+        JUDGMENT carries a court and a state party ("THE STATE OF BIHAR"); NEWS carries a desk
+        ("Indian Express - Mumbai"); anything else falls back to the first place named in the text.
+        """
+        if source_type == "JUDGMENT":
+            return geo.locate(meta.get("court"), meta.get("respondent"), meta.get("petitioner"), title)
+        if source_type == "NEWS":
+            return geo.locate(meta.get("feed"), title, text[:400])
+        return geo.locate(meta.get("country"), title, text[:400])
 
     def _holder_entity(self, holder: str, seen: datetime | None):
         etype = ORGANIZATION if ORG_HINT.search(holder or "") else PERSON
@@ -158,8 +184,16 @@ class IngestionService:
             if m.type == LOCATION:
                 g = self.gazetteer.get(m.text) or {}
                 attrs.update({"lat": g.get("lat"), "lon": g.get("lon")})
+                if attrs["lat"] is None:
+                    hit = geo.locate(m.text)
+                    if hit:
+                        attrs.update({"lat": hit["lat"], "lon": hit["lon"], "geo_precision": hit["precision"],
+                                      "geo_matched": hit["matched"]})
             aliases = [m.attrs["alias"]] if m.attrs.get("alias") else None
-            e = self.resolver.resolve(m.type, m.text, attrs, when, aliases)
+            # free text yields grammar as often as names: a rejected mention is skipped, not stored
+            e = self.resolver.resolve_opt(m.type, m.text, attrs, when, aliases)
+            if e is None:
+                continue
             ents[m.key] = e
             snippet = text[max(0, m.start - 60): m.end + 60]
             add_entity_evidence(self.db, doc.id, e.id, snippet, m.confidence, when, extractor)
@@ -258,8 +292,12 @@ class IngestionService:
         ents = self._apply_extraction(doc, text, res, when, anchor)
         self._enrich(doc, text, when, anchor)
         if when:
+            # Place the event. A judgment sits at the seat of its court and a news item at its desk
+            # city - never at a scene we were never told about, so `geo_precision` travels with it.
+            g = self._event_point(source_type, title, text, meta or {})
             add_event(self.db, doc.id, source_type, when, [e.id for e in ents.values()] + ([anchor.id] if anchor else []),
-                      f"{source_type}: {title}", {"sections": res.sections})
+                      f"{source_type}: {title}", {"sections": res.sections, **({"geo": g} if g else {})},
+                      lat=(g or {}).get("lat"), lon=(g or {}).get("lon"))
             self.stats.events += 1
         self.stats.records += 1
         if finish:
@@ -302,7 +340,9 @@ class IngestionService:
             for g in self.gazetteer:
                 if g.lower() == ps.lower():
                     lat, lon = self.gazetteer[g]["lat"], self.gazetteer[g]["lon"]
-                    self.acc.add(case.id, self._loc(g, when).id, "REGISTERED_AT", at=when, doc_id=doc.id, snippet=f.get("police_station", ""), extractor="structured")
+                    ps_loc = self._loc(g, when)
+                    if ps_loc:
+                        self.acc.add(case.id, ps_loc.id, "REGISTERED_AT", at=when, doc_id=doc.id, snippet=f.get("police_station", ""), extractor="structured")
             self._enrich(doc, text, when, case)
             if when:
                 add_event(self.db, doc.id, "FIR", when, [e.id for e in ents.values()] + [case.id],
@@ -342,7 +382,9 @@ class IngestionService:
                              attrs={"kyc_status": "unverified" if unverified else "verified"})
                 addr = (r.get("address") or "").split(",")[0].strip()
                 if addr and addr in self.gazetteer:
-                    self.acc.add(p.id, self._loc(addr).id, "RESIDES_AT", confidence=0.8, doc_id=doc.id, snippet=f"KYC address: {r.get('address')}", extractor="structured")
+                    addr_loc = self._loc(addr)
+                    if addr_loc:
+                        self.acc.add(p.id, addr_loc.id, "RESIDES_AT", confidence=0.8, doc_id=doc.id, snippet=f"KYC address: {r.get('address')}", extractor="structured")
             self.stats.records += 1
             if i % 25 == 0:
                 self.progress("KYC", i + 1, len(rows))
@@ -377,8 +419,9 @@ class IngestionService:
             lat = lon = None
             if tower:
                 loc = self._loc(tower, when)
-                lat, lon = loc.attributes.get("lat"), loc.attributes.get("lon")
-                self.acc.add(pa.id, loc.id, "PINGED_AT", weight=0.2, at=when, extractor="structured")
+                if loc:
+                    lat, lon = loc.attributes.get("lat"), loc.attributes.get("lon")
+                    self.acc.add(pa.id, loc.id, "PINGED_AT", weight=0.2, at=when, extractor="structured")
             add_event(self.db, doc.id, "CALL", when or datetime.now(), [pa.id, pb.id],
                       f"{'SMS' if r.get('call_type') == 'SMS' else 'Call'} {pa.label} -> {pb.label} ({dur}s)",
                       {"duration_sec": dur, "tower": tower, "call_type": r.get("call_type"), "night": night, "call_id": r.get("call_id")}, lat, lon)

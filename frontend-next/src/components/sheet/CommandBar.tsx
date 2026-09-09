@@ -23,7 +23,7 @@ export default function CommandBar() {
   const presentation = useSheet((s) => s.presentation);
   const [q, setQ] = useState("");
   const router = useRouter();
-  const { data: hits } = useQuery({ queryKey: ["cmd", q], queryFn: () => api.entities({ q, limit: 12 }), enabled: open && q.trim().length >= 2, staleTime: 10_000 });
+  const { data: hits } = useQuery({ queryKey: ["cmd", q], queryFn: () => api.entities({ q, limit: 12 }).then((p) => p.items), enabled: open && q.trim().length >= 2, staleTime: 10_000 });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

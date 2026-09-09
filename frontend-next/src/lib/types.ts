@@ -98,3 +98,13 @@ export interface LinkagePair { a: string; b: string; a_title: string; b_title: s
 
 export interface DocumentSummary { id: string; source_type: string; title: string; occurred_at: string | null; records: number; preview: string }
 export interface DocumentDetail extends Omit<DocumentSummary, "preview"> { content: string; meta: Record<string, unknown>; entities: { id: string; label: string; type: EntityType; snippet: string; confidence: number; extractor: Extractor }[] }
+
+/** A page of the entity table. `total` is the unpaged count, so a view can say what it is not showing. */
+export type EntityPage = {
+  items: NodeView[];
+  total: number;
+  offset: number;
+  limit: number;
+  returned: number;
+  complete: boolean;
+};

@@ -87,21 +87,42 @@ def path(src: str, dst: str, db: Annotated[Session, Depends(get_session)], _: An
 
 @router.get("/entities")
 def entities(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)], q: str = "",
-             types: Annotated[list[str] | None, Query()] = None, sort: str = "priority", limit: int = 50):
+             types: Annotated[list[str] | None, Query()] = None, sort: str = "priority", limit: int = 50,
+             offset: int = 0, roles: Annotated[list[str] | None, Query()] = None, exclude_roles: bool = False):
+    """
+    The entity table, served whole.
+
+    `limit=0` returns every row so a client can hold the full set; otherwise page with
+    `offset`. `total` is always the unpaged count, so the UI can say how much it is not showing
+    instead of quietly truncating. `roles` filters on standing in the record (judge, institution,
+    authority, petitioner, respondent); `exclude_roles=true` inverts it, which is how a caller asks
+    for subjects only rather than court machinery.
+    """
+    from ..db import Entity
+
     G = graph_cache.get(db)
     snap = analysis_service.snapshot(db)
     if q:
-        rows = Q.find_entities(db, q, types, limit)
-        ids = [e.id for e in rows]
+        rows = Q.find_entities(db, q, types, limit or 10_000)
+        ids, total = [e.id for e in rows], len(rows)
     else:
-        from ..db import Entity
-
         query = db.query(Entity)
         if types:
             query = query.filter(Entity.type.in_(types))
+        if roles:
+            # as_string() rather than .astext: the column is a generic JSON, so this has to work on
+            # SQLite (local dev) as well as Postgres
+            expr = Entity.attributes["record_role"].as_string().in_(roles)
+            query = query.filter(~expr if exclude_roles else expr)
+        total = query.count()
         order = Entity.risk_score.desc() if sort == "priority" else Entity.mention_count.desc()
-        ids = [e.id for e in query.order_by(order).limit(limit).all()]
-    return [Q.node_view(G, i, snap) for i in ids if i in G]
+        query = query.order_by(order).offset(max(offset, 0))
+        if limit:
+            query = query.limit(limit)
+        ids = [e.id for e in query.all()]
+    items = [Q.node_view(G, i, snap) for i in ids if i in G]
+    return {"items": items, "total": total, "offset": offset, "limit": limit,
+            "returned": len(items), "complete": len(items) >= total}
 
 
 @router.get("/entities/{eid}")
@@ -218,6 +239,7 @@ def timeline(db: Annotated[Session, Depends(get_session)], _: Annotated[User, De
     if end:
         q = q.filter(TimelineEvent.occurred_at <= end)
     out = []
+    matched = 0
     for e in q.order_by(TimelineEvent.occurred_at).all():
         ids = e.entity_ids or []
         if entity and entity not in ids:
@@ -225,18 +247,20 @@ def timeline(db: Annotated[Session, Depends(get_session)], _: Annotated[User, De
         actors = {owner_of.get(i, i) for i in ids}
         if only_poi and not entity and not (actors & poi):
             continue
+        matched += 1
+        if limit and len(out) >= limit:
+            continue  # keep counting so `total` is honest about what the cap is hiding
         out.append({"id": e.id, "kind": e.kind, "at": e.occurred_at.isoformat(), "summary": e.summary, "details": e.details, "lat": e.lat, "lon": e.lon,
                     "entity_ids": ids, "actors": [{"id": a, "label": G.nodes[a]["label"]} for a in actors if a in G][:6], "document_id": e.document_id})
-        if len(out) >= limit:
-            break
-    return out
+    return {"items": out, "total": matched, "returned": len(out), "limit": limit,
+            "complete": len(out) == matched}
 
 
 @router.get("/timeline/histogram")
 def histogram(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)], bucket: str = "day", only_poi: bool = True):
     from collections import Counter
 
-    events = timeline(db, _, None, None, None, None, 100000, only_poi)  # type: ignore[arg-type]
+    events = timeline(db, _, None, None, None, None, 0, only_poi)["items"]  # type: ignore[arg-type]
     c: dict[str, Counter] = {}
     for e in events:
         key = e["at"][:10] if bucket == "day" else e["at"][:7]

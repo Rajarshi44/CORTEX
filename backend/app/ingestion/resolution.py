@@ -20,6 +20,15 @@ from ..config import settings
 from ..db import Entity
 from .ner import (BANK_ACCOUNT, CASE, GOV_ID, LOCATION, ORGANIZATION, PERSON, PHONE, REPORT, SOCIAL_HANDLE,
                   VEHICLE, RuleNER)
+from .quality import is_junk, role_of
+
+
+class JunkMention(ValueError):
+    """A mention that must not become an entity (stopword, bare number, ISO code as a place)."""
+
+    def __init__(self, etype: str, text: str, reason: str):
+        super().__init__(f"{etype}:{text!r} rejected - {reason}")
+        self.etype, self.text, self.reason = etype, text, reason
 
 HONORIFIC_RE = re.compile(r"^(?:shri|smt|sri|mr|mrs|ms|miss|dr|adv|kum)\.?\s+", re.I)
 ORG_SUFFIX_RE = re.compile(r"\b(pvt\.?\s*ltd\.?|private\s+limited|ltd\.?|limited|llp|co\.?|company)\b\.?", re.I)
@@ -57,6 +66,7 @@ class EntityResolver:
         self.alias_index: dict[str, list[Entity]] = {}  # lowercase alias -> entities
         self.person_labels: dict[str, Entity] = {}  # label -> entity (for fuzzy)
         self.new_entities = 0
+        self.rejected = 0  # mentions refused by quality.is_junk
         self.merges = 0
         self._load()
 
@@ -91,6 +101,9 @@ class EntityResolver:
         two KYC records "Meena D'Souza / Vasco" and "Meena D'Souza / Chembur" become distinct persons.
         """
         attrs = dict(attrs or {})
+        rejected, why = is_junk(etype, text)
+        if rejected:
+            raise JunkMention(etype, text, why)
         key = canonical_key(etype, text)
         if not key:
             raise ValueError(f"empty key for {etype}:{text!r}")
@@ -153,9 +166,26 @@ class EntityResolver:
                 ent.first_seen = seen
             if ent.last_seen is None or seen > ent.last_seen:
                 ent.last_seen = seen
+        # Standing in the record (judge / institution / authority / party). Ranking and suspicion
+        # read this to keep the machinery of a case out of its list of subjects.
+        role = role_of(etype, ent.label, ent.attributes)
+        if role and ent.attributes.get("record_role") != role:
+            ent.attributes = {**ent.attributes, "record_role": role}
+            changed = True
         if changed:
             self.db.add(ent)
         return ent
+
+    def resolve_opt(self, etype: str, text: str, attrs: dict | None = None, seen: datetime | None = None,
+                    aliases: list[str] | None = None, discriminator: str | None = None) -> Entity | None:
+        """`resolve` for free text that may be noise: returns None instead of raising on a junk mention."""
+        try:
+            return self.resolve(etype, text, attrs, seen, aliases, discriminator)
+        except JunkMention:
+            self.rejected += 1
+            return None
+        except ValueError:
+            return None
 
     # ------------------------------------------------------------------ internals
     @staticmethod
