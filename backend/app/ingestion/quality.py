@@ -84,8 +84,19 @@ def is_person_name(label: str) -> bool:
     if not _ASCII_LETTER_RE.search(t):
         return True  # Devanagari and other caseless scripts: cannot judge by capitalisation
     core = _LEADING_CUE_RE.sub("", t).strip()
-    if not core or not _CAP_TOKEN_RE.search(core):
+    if not core:
         return False
+        
+    has_cap = False
+    for tok in core.split():
+        clean_tok = tok.strip(".,'’")
+        if len(clean_tok) >= 2 and clean_tok[0].isupper() and any(c.isalpha() for c in clean_tok[1:]):
+            has_cap = True
+            break
+            
+    if not has_cap:
+        return False
+        
     tokens = [tok.strip(".,'’").lower() for tok in core.split()]
     tokens = [tok for tok in tokens if tok]
     if not tokens:

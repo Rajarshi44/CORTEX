@@ -60,10 +60,12 @@ function EvidenceNote({ e, i }: { e: Evidence; i: number }) {
       <blockquote className="border-l border-rule-strong pl-2 text-[length:var(--fs-body)] leading-snug text-ink">“{(e.snippet ?? "").trim()}”</blockquote>
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-2">
         <span className="figure label text-ink-faint">{String(i + 1).padStart(2, "0")}</span>
-        <LineSample style={style} width={20} />
-        <span className="label border border-rule-strong px-1 py-px text-ink-soft" title="How this was read out of the document">{e.extractor}</span>
-        <span className="figure note">{Math.round((e.confidence ?? 0) * 100)}% confidence</span>
-        {at && <span className="figure note">{at}</span>}
+        <span className="flex-1 text-[var(--fs-note)] leading-tight text-ink-soft">
+          Extracted by <span className="label text-ink">{e.extractor}</span>
+          {e.at && <span> at <span className="figure text-ink">{format(new Date(e.at), "dd MMM HH:mm")}</span></span>}
+        </span>
+        <LineSample style={style} width={22} />
+        <span className="label figure px-1 py-0.5 text-ink-faint">{(e.confidence * 100).toFixed(0)}% conf</span>
       </div>
       <p className="mt-1 flex flex-wrap items-baseline gap-x-2 pl-2">
         <SourceLink title={e.document_title} href={href} plain={sourceLabel(e.source_type, e.source_name)} />

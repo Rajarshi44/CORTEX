@@ -436,7 +436,7 @@ def key_players(P: nx.Graph, metrics: dict, roles: dict, community: dict, priori
     # a name with no ties is a record, not a player; and a judge, the State or a court is the
     # machinery of the case rather than a player in it
     ranked = [(n, p) for n, p in ranked
-              if metrics[n]["degree"] > 0
+              if metrics[n]["degree"] >= 0
               and not is_non_subject(P.nodes[n].get("type", ""), P.nodes[n].get("label", ""), P.nodes[n].get("attrs") or {})]
     for n, p in ranked[:top]:
         r = roles.get(n, {})

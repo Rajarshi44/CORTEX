@@ -131,7 +131,9 @@ def documents(db: Annotated[Session, Depends(get_session)], _: Annotated[User, D
     query = db.query(Document)
     if entity_id:
         from ..db import Evidence
-        query = query.join(Evidence, Evidence.document_id == Document.id).filter(Evidence.entity_id == entity_id).distinct()
+        query = query.filter(Document.id.in_(
+            db.query(Evidence.document_id).filter(Evidence.entity_id == entity_id)
+        ))
     if source_type:
         query = query.filter(Document.source_type == source_type.upper())
     if q:
@@ -155,7 +157,12 @@ def document(doc_id: str, db: Annotated[Session, Depends(get_session)], _: Annot
         if ev.entity_id and ev.entity_id in G:
             ents[ev.entity_id] = {"id": ev.entity_id, "label": G.nodes[ev.entity_id]["label"], "type": G.nodes[ev.entity_id]["type"],
                                   "snippet": ev.snippet, "confidence": ev.confidence, "extractor": ev.extractor}
+    bind_url = db.get_bind().url
+    db_name = bind_url.database.split("/")[-1] if bind_url.database else "cna"
+    db_type = "PostgreSQL" if "postgres" in bind_url.drivername else "SQLite" if "sqlite" in bind_url.drivername else bind_url.drivername
+    
     return {"id": d.id, "source_type": d.source_type, "title": d.title, "content": d.content, "meta": d.meta,
+            "storage": {"database": f"{db_type} ({db_name})", "table": "documents"},
             "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None, "records": d.record_count,
             "entities": sorted(ents.values(), key=lambda e: e["type"])}
 

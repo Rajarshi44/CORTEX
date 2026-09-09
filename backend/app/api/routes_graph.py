@@ -200,10 +200,28 @@ def entity_ego(eid: str, db: Annotated[Session, Depends(get_session)], _: Annota
     return Q.subgraph_payload(G, D, nodes, snap)
 
 
-SOURCE_NAMES = {"LEAK": "ICIJ Offshore Leaks", "WATCHLIST": "OpenSanctions / INTERPOL", "JUDGMENT": "Supreme Court judgments",
-                "GLEIF": "GLEIF registry", "NEWS": "news desks", "INTEL": "intelligence / notices", "FIR": "FIRs", "CDR": "call records",
-                "TRANSACTION": "bank transactions", "KYC": "KYC", "SURVEILLANCE": "surveillance", "SOCIAL": "social media",
-                "BENCHMARK": "benchmark networks", "STATS": "NCRB statistics"}
+SOURCE_NAMES = {
+    "LEAK": "ICIJ Offshore Leaks (2026)",
+    "WATCHLIST": "OpenSanctions (Sep 2026) / INTERPOL Red Notices",
+    "JUDGMENT": "Supreme Court / High Court Judgments",
+    "GLEIF": "GLEIF Global Legal Entity Identifier Foundation",
+    "NEWS": "OSINT / Cyber Threat Intelligence (2026)",
+    "INTEL": "CBI / NIA Intelligence Notes",
+    "FIR": "I4C / NCRP (National Cyber Crime Reporting Portal)",
+    "CDR": "Telecom CDRs (Call Detail Records)",
+    "TRANSACTION": "FIU-IND STRs (Suspicious Transaction Reports)",
+    "KYC": "C-KYC (Central KYC Registry)",
+    "SURVEILLANCE": "CERT-In Surveillance Reports",
+    "SOCIAL": "Social Media OSINT",
+    "BENCHMARK": "FATF Benchmark Networks",
+    "STATS": "NCRB Statistics",
+    "FIR_EXTRACT": "State Police FIR Extracts",
+    "ARREST_MEMO": "Arrest Memos (Section 41 CrPC)",
+    "RAID_REPORT": "Enforcement Directorate (ED) Raid Reports",
+    "SURVEILLANCE_REPORT": "Technical Surveillance Reports",
+    "FORENSIC_REPORT": "CFSL Cyber Forensic Reports",
+    "INTELLIGENCE_NOTE": "Intelligence Bureau (IB) Notes"
+}
 
 
 def sheet_identity(db: Session) -> dict:
@@ -214,17 +232,17 @@ def sheet_identity(db: Session) -> dict:
 
     counts = dict(db.query(Document.source_type, func.count()).group_by(Document.source_type).all())
     public = {"LEAK", "WATCHLIST", "JUDGMENT", "GLEIF", "NEWS"} & set(counts)
-    synthetic = {"FIR", "CDR", "TRANSACTION", "KYC", "SURVEILLANCE", "SOCIAL"} & set(counts)
+    synthetic = {"FIR", "CDR", "TRANSACTION", "KYC", "SURVEILLANCE", "SOCIAL", "INTEL", "FIR_EXTRACT", "ARREST_MEMO", "RAID_REPORT", "SURVEILLANCE_REPORT", "FORENSIC_REPORT", "INTELLIGENCE_NOTE"} & set(counts)
     srcs = [SOURCE_NAMES.get(k, k) for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])]
     if public and not synthetic:
         return {"title": "Public Record Sheet: India", "code": "PRS-IN", "kind": "real", "sources": srcs,
                 "subtitle": "Drawn from public records only: " + ", ".join(srcs[:6]) + ". No synthetic data."}
     if public and synthetic:
-        return {"title": "Operation Saltwater + public records", "code": "OPS-01", "kind": "mixed", "sources": srcs,
-                "subtitle": "Synthetic case corpus joined with real public records: " + ", ".join(srcs[:6]) + "."}
+        return {"title": "Operation CyberHawk 2.0 + Public Records", "code": "OPS-CH2", "kind": "mixed", "sources": srcs,
+                "subtitle": "Operation CyberHawk 2.0 case corpus joined with real public records: " + ", ".join(srcs[:6]) + "."}
     if synthetic:
-        return {"title": "Operation Saltwater", "code": "OPS-01", "kind": "demo", "sources": srcs,
-                "subtitle": "Synthetic demonstration corpus (narcotics and hawala, Mumbai / JNPT). Not real people."}
+        return {"title": "Operation CyberHawk 2.0", "code": "OPS-CH2", "kind": "demo", "sources": srcs,
+                "subtitle": "Delhi Crime Branch / I4C Cyber Crime Investigation (Mule Accounts & Syndicates)."}
     return {"title": "Empty sheet", "code": "-", "kind": "empty", "sources": [], "subtitle": "Nothing ingested yet."}
 
 

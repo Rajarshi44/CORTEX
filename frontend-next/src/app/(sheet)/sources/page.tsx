@@ -22,7 +22,7 @@ import { CONNECTOR_GROUPS, CONNECTOR_GIST, connectorHref, sourceLabel, sourceHre
 import type { EntityType, SourceInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 const HARVEST_PRESETS: Record<string, { label: string; params: Record<string, unknown> }[]> = {
   courts: [{ label: "Supreme Court 2024, criminal", params: { court: "sc", year: 2024, limit: 120 } }, { label: "Bombay HC 2024", params: { court: "hc", year: 2024, bench: "bombay", limit: 80 } }],
@@ -282,6 +282,38 @@ function Sources() {
                   )}
                   {doc.content && <pre className="mt-4 max-h-72 overflow-y-auto whitespace-pre-wrap border-l border-rule-strong pl-3 font-sans text-[length:var(--fs-body)] leading-relaxed">{doc.content.slice(0, 4000)}</pre>}
                   <VerifyDoc id={doc.id} />
+                  {doc.meta && Object.keys(doc.meta).length > 0 && (
+                    <div className="mt-4 border-t border-rule-strong pt-3">
+                      <h4 className="label text-ink-faint mb-2">Source metadata</h4>
+                      <dl className="space-y-1.5 text-[var(--fs-note)]">
+                        {Object.entries(doc.meta).map(([k, v]) => (
+                          <div key={k} className="flex flex-col sm:flex-row sm:gap-4">
+                            <dt className="text-ink-soft w-24 shrink-0">{k}</dt>
+                            <dd className="text-ink break-all">
+                              {typeof v === 'string' && v.startsWith('http') ? (
+                                <a href={v} target="_blank" rel="noreferrer" className="hover:text-pencil inline-flex items-center gap-1">{v} <ExternalLink className="h-3 w-3" /></a>
+                              ) : (
+                                String(v)
+                              )}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  )}
+                  <div className="mt-4 border-t border-rule-strong pt-3">
+                    <h4 className="label text-ink-faint mb-2">Storage Location</h4>
+                    <dl className="space-y-1.5 text-[var(--fs-note)]">
+                      <div className="flex flex-col sm:flex-row sm:gap-4">
+                        <dt className="text-ink-soft w-24 shrink-0">Database</dt>
+                        <dd className="text-ink">{doc.storage?.database ?? "SQLite (cna.db)"}</dd>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:gap-4">
+                        <dt className="text-ink-soft w-24 shrink-0">Table</dt>
+                        <dd className="text-ink">{doc.storage?.table ?? "documents"}</dd>
+                      </div>
+                    </dl>
+                  </div>
                 </article>
               ) : (
                 <p className="note">Pick a document to read it.</p>

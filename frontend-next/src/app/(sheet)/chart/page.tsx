@@ -23,7 +23,7 @@ function ChartLens() {
   const [depth] = useQueryState("depth", parseAsInteger.withDefault(2));
   const [pathA, setPathA] = useQueryState("from", parseAsString);
   const [pathB, setPathB] = useQueryState("to", parseAsString);
-  const [infra, setInfra] = useQueryState("infra", parseAsBoolean.withDefault(false));
+  const [infra, setInfra] = useQueryState("infra", parseAsBoolean.withDefault(true));
   const [onlyPoi, setOnlyPoi] = useQueryState("poi", parseAsBoolean.withDefault(false));
   const hiddenTypes = useSheet((s) => s.hiddenTypes);
   const hiddenRels = useSheet((s) => s.hiddenRelations);
