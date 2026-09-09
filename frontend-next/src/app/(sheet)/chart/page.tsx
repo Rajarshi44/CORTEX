@@ -7,9 +7,9 @@ import { api } from "@/lib/api";
 import { useGraph, useEgo, usePath } from "@/lib/queries";
 import { projectionToChart } from "@/lib/projection";
 import { useSheet } from "@/lib/store";
+import { ArrowLeft } from "lucide-react";
 import KeyRail from "@/components/sheet/KeyRail";
 import TitleBlock from "@/components/sheet/TitleBlock";
-import RegisterStrip from "@/components/sheet/RegisterStrip";
 import Narrative from "@/components/sheet/Narrative";
 import HoverCaption from "@/components/chart/HoverCaption";
 import type { EdgeView, NodeView } from "@/lib/types";
@@ -78,37 +78,47 @@ function ChartLens() {
   return (
     <div className="flex min-h-0 flex-1">
       <KeyRail counts={counts} />
-      <div className="sheet-ground relative min-w-0 flex-1">
-        {loading && <div className="absolute inset-0 z-10 grid place-items-center bg-film/60"><p className="label text-ink-faint">Laying out the chart…</p></div>}
-        {error && <div className="absolute inset-0 z-10 grid place-items-center"><p className="note-paper p-4 text-pencil">The chart could not be loaded: {String((error as Error).message)}</p></div>}
-        <LinkChart nodes={nodes} edges={edges} emphasis={highlights} route={route} labelAll={!infra && nodes.length <= 90}
-          onSelect={(id) => { select(id); if (id && (window.event as KeyboardEvent | undefined)?.shiftKey) pickForPath(id); }} onHover={setHover} />
-        <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[46rem] flex-col gap-2">
-          <div className="pointer-events-auto note-paper flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5">
-            <span className="label label-ink">{focus ? "Redrawn around selection" : infra ? "Full record" : "Actor chart"}</span>
-            {focus && <button type="button" onClick={() => { setFocus(null); setRoute(null); }} className="label text-pencil hover:underline">← whole sheet</button>}
-            {!focus && <>
-              <label className="flex items-center gap-1.5 text-[var(--fs-note)]"><input type="checkbox" checked={onlyPoi} onChange={(e) => setOnlyPoi(e.target.checked)} className="accent-pencil" />Persons of interest only</label>
-              <label className="flex items-center gap-1.5 text-[var(--fs-note)]" title="Draw phones, accounts, vehicles, handles and locations as their own marks"><input type="checkbox" checked={infra} onChange={(e) => setInfra(e.target.checked)} className="accent-pencil" />Show infrastructure</label>
-            </>}
-            {highlights.length > 0 && <button type="button" onClick={() => setHighlights([], "Emphasis cleared.")} className="label text-ink-soft hover:text-pencil">clear emphasis</button>}
-          </div>
-          <div className="pointer-events-auto note-paper flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1">
-            <span className="label text-ink-faint">Lines</span>
-            {REL_GROUPS.map((g) => { const off = g.rels.every((r) => hiddenRels.includes(r)); return <button key={g.key} type="button" aria-pressed={!off} onClick={() => g.rels.forEach((r) => { if (off === hiddenRels.includes(r)) toggleRel(r); })} className={cn("label rounded-[2px] px-1.5 py-0.5", off ? "text-ink-faint line-through" : "label-ink hover:bg-film-deep")}>{g.label}</button>; })}
-          </div>
-          <div className="pointer-events-auto note-paper flex items-center gap-2 px-3 py-1 text-[var(--fs-note)]">
-            <span className="label text-ink-faint">Route</span>
-            <span className="figure">{pathA ? nodeById.get(pathA)?.label ?? "…" : "shift-click a start"}</span><span className="text-ink-faint">→</span><span className="figure">{pathB ? nodeById.get(pathB)?.label ?? "…" : pathA ? "shift-click an end" : "—"}</span>
-            {(pathA || pathB) && <button type="button" onClick={() => { setPathA(null); setPathB(null); setRoute(null); }} className="label text-pencil hover:underline">clear</button>}
-            {path.isFetching && <span className="text-ink-faint">finding…</span>}
+      {/*
+        The controls are docked, not floated. Panels lying on top of a route map hide exactly the
+        lines the map exists to show, and on a projector the reader cannot move them out of the way.
+        Only the hover caption stays over the plate, because it is about the mark under the pointer.
+      */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-rule-strong bg-film-lift px-3 py-1.5">
+          <span className="label label-ink">{focus ? "Redrawn around selection" : infra ? "Full record" : "Actor chart"}</span>
+          {focus && <button type="button" onClick={() => { setFocus(null); setRoute(null); }} className="label flex items-center border border-rule-strong px-2 py-0.5 hover:border-ink hover:text-ink"><ArrowLeft className="mr-1 h-3 w-3" aria-hidden="true" />Whole sheet</button>}
+          {!focus && <>
+            <label className="flex items-center gap-1.5 text-[length:var(--fs-note)]"><input type="checkbox" checked={onlyPoi} onChange={(e) => setOnlyPoi(e.target.checked)} className="accent-ink" />Persons of interest only</label>
+            <label className="flex items-center gap-1.5 text-[length:var(--fs-note)]" title="Draw phones, accounts, vehicles, handles and locations as their own marks"><input type="checkbox" checked={infra} onChange={(e) => setInfra(e.target.checked)} className="accent-ink" />Show infrastructure</label>
+          </>}
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="label text-ink-soft">Lines</span>
+            {REL_GROUPS.map((g) => { const off = g.rels.every((r) => hiddenRels.includes(r)); return <button key={g.key} type="button" aria-pressed={!off} onClick={() => g.rels.forEach((r) => { if (off === hiddenRels.includes(r)) toggleRel(r); })} className={cn("label px-1.5 py-0.5", off ? "text-ink-faint line-through" : "label-ink bg-film-deep hover:bg-rule")}>{g.label}</button>; })}
+          </span>
+          <span className="flex items-center gap-2 text-[length:var(--fs-note)]">
+            <span className="label text-ink-soft">Route</span>
+            <span className="figure">{pathA ? nodeById.get(pathA)?.label ?? "…" : "shift-click a start"}</span>
+            <span className="text-ink-faint" aria-label="to">&mdash;</span>
+            <span className="figure">{pathB ? nodeById.get(pathB)?.label ?? "…" : pathA ? "shift-click an end" : "—"}</span>
+            {(pathA || pathB) && <button type="button" onClick={() => { setPathA(null); setPathB(null); setRoute(null); }} className="label text-ink-soft hover:text-ink">clear</button>}
+            {path.isFetching && <span className="text-ink-soft">finding…</span>}
             {path.data && !path.data.paths.length && <span className="text-pencil">no path</span>}
-          </div>
-          <Narrative />
+          </span>
+          {highlights.length > 0 && <button type="button" onClick={() => setHighlights([], "Emphasis cleared.")} className="label ml-auto text-ink-soft hover:text-ink">clear emphasis</button>}
         </div>
-        <div className="pointer-events-none absolute right-3 top-3 z-10"><RegisterStrip compact /></div>
-        <div className="pointer-events-none absolute bottom-3 right-3 z-10"><TitleBlock sheet={focus ? `Ego · ${nodeById.get(focus)?.label ?? focus.slice(0, 8)}` : undefined} lens="Chart" /></div>
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10"><HoverCaption hit={hover} nodeById={nodeById} /></div>
+
+        <div className="sheet-ground relative min-h-0 flex-1">
+          {loading && <div className="absolute inset-0 z-10 grid place-items-center bg-film/60"><p className="label text-ink-soft">Laying out the chart…</p></div>}
+          {error && <div className="absolute inset-0 z-10 grid place-items-center"><p className="note-paper p-4 text-pencil">The chart could not be loaded: {String((error as Error).message)}</p></div>}
+          <LinkChart nodes={nodes} edges={edges} emphasis={highlights} route={route} labelAll={!infra && nodes.length <= 90}
+            onSelect={(id) => { select(id); if (id && (window.event as KeyboardEvent | undefined)?.shiftKey) pickForPath(id); }} onHover={setHover} />
+          <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-10 flex items-end justify-between gap-3">
+            <HoverCaption hit={hover} nodeById={nodeById} />
+            <div className="ml-auto hidden lg:block"><TitleBlock sheet={focus ? `Ego · ${nodeById.get(focus)?.label ?? focus.slice(0, 8)}` : undefined} lens="Chart" /></div>
+          </div>
+        </div>
+
+        <Narrative />
       </div>
     </div>
   );

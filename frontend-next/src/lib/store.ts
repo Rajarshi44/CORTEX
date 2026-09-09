@@ -73,7 +73,7 @@ export const useSheet = create<SheetState>()(
       setNotesOpen: (notesOpen) => set({ notesOpen }),
     }),
     {
-      name: "sutra.sheet",
+      name: "cortex.sheet",
       partialize: (s) => ({ presentation: s.presentation, hiddenTypes: s.hiddenTypes, hiddenRelations: s.hiddenRelations, minPriority: s.minPriority, user: s.user }),
     },
   ),

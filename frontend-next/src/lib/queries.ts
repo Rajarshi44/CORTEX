@@ -1,7 +1,7 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
-import type { AlertStatus } from "./types";
+import type { AlertStatus, HitStatus, Severity, WatchKind } from "./types";
 
 export const qk = {
   me: ["me"] as const,
@@ -25,6 +25,9 @@ export const qk = {
   documents: (p: unknown) => ["documents", p] as const,
   document: (id: string) => ["document", id] as const,
   path: (a: string, b: string) => ["path", a, b] as const,
+  watches: ["watches"] as const,
+  watchKinds: ["watchKinds"] as const,
+  watchHits: (p: unknown) => ["watchHits", p] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: qk.me, queryFn: api.me, retry: false });
@@ -56,6 +59,34 @@ export function useAlertStatus() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["alerts"] }); qc.invalidateQueries({ queryKey: ["entity"] }); },
   });
 }
+
+// ----------------------------------------------------------------- standing watches
+export const useWatches = () => useQuery({ queryKey: qk.watches, queryFn: () => api.watches() });
+export const useWatchKinds = () => useQuery({ queryKey: qk.watchKinds, queryFn: api.watchKinds, staleTime: 600_000 });
+export const useWatchHits = (p: Parameters<typeof api.watchHits>[0] = {}) =>
+  useQuery({ queryKey: qk.watchHits(p), queryFn: () => api.watchHits(p) });
+
+/** Every watch mutation moves both lists: the register of hits and the counter on the watch. */
+function useWatchMutation<V, R>(fn: (v: V) => Promise<R>) {
+  const qc = useQueryClient();
+  return useMutation<R, Error, V>({
+    mutationFn: fn,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["watches"] });
+      qc.invalidateQueries({ queryKey: ["watchHits"] });
+    },
+  });
+}
+
+export const useCreateWatch = () =>
+  useWatchMutation(({ kind, value, reason, severity }: { kind: WatchKind; value: string; reason?: string; severity?: Severity }) =>
+    api.createWatch(kind, value, reason, severity));
+export const useDeleteWatch = () => useWatchMutation((id: string) => api.deleteWatch(id));
+export const useRescanWatch = () => useWatchMutation((id: string) => api.rescanWatch(id));
+export const useToggleWatch = () =>
+  useWatchMutation(({ id, active }: { id: string; active: boolean }) => api.patchWatch(id, { active }));
+export const useWatchHitStatus = () =>
+  useWatchMutation(({ id, status }: { id: number; status: HitStatus }) => api.patchWatchHit(id, status));
 
 /** After any ingestion the whole sheet is stale. */
 export function useInvalidateSheet() {

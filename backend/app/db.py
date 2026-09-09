@@ -163,6 +163,65 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
+class Watch(Base):
+    """A standing request: say something when a record touches this selector.
+
+    The detectors in `graph/anomalies.py` reason over the whole corpus and are replaced on every
+    recompute. That is the right shape for "this cluster looks like structuring" and the wrong shape
+    for "tell me the moment anything mentions this number". CCTNS runs the second kind nationally -
+    the auto-match services for missing/found persons and missing/found vehicles - and a Watch is
+    that, generalised: one selector, checked against every arriving record, kept with the document
+    that triggered it.
+
+    `norm` is the matching key, never the thing the analyst typed. For a sensitive government
+    identifier it is a salted fingerprint, so a watch on an Aadhaar number can fire without the
+    number ever being stored - the same guarantee `ingestion/identifiers.py` gives the graph.
+    """
+
+    __tablename__ = "watches"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(24), index=True)  # PERSON|ORGANIZATION|PHONE|VEHICLE|BANK_ACCOUNT|GOV_ID|TEXT
+    selector: Mapped[str] = mapped_column(String(300))  # display form; masked for a sensitive identifier
+    norm: Mapped[str] = mapped_column(String(300), index=True)  # matching key
+    reason: Mapped[str] = mapped_column(Text, default="")  # why it is watched; copied onto every hit
+    severity: Mapped[str] = mapped_column(String(16), default="high")  # stamped on hits
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_hit_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    hit_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # One selector is watched once. A second analyst asking for the same number joins the existing
+    # watch rather than doubling every alert it raises.
+    __table_args__ = (Index("ix_watch_kind_norm", "kind", "norm", unique=True),)
+
+
+class WatchHit(Base):
+    """One arriving record matched one watch.
+
+    Durable by design: unlike a detector alert, a hit is a historical fact about a document that
+    arrived, so a recompute must never delete it. `entity_id` is "" when the match was on document
+    text rather than on a resolved entity, which keeps the uniqueness index usable on SQLite (where
+    NULLs do not compare equal and would let the same hit insert twice).
+    """
+
+    __tablename__ = "watch_hits"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    watch_id: Mapped[str] = mapped_column(String(36), ForeignKey("watches.id"), index=True)
+    document_id: Mapped[str] = mapped_column(String(36), ForeignKey("documents.id"), index=True)
+    entity_id: Mapped[str] = mapped_column(String(36), default="", index=True)
+    matched_on: Mapped[str] = mapped_column(String(200), default="")  # what matched, in words
+    snippet: Mapped[str] = mapped_column(Text, default="")
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="new", index=True)  # new|reviewing|dismissed|confirmed
+
+    watch: Mapped[Watch] = relationship()
+    document: Mapped[Document] = relationship()
+
+    __table_args__ = (Index("ix_watch_hit_unique", "watch_id", "document_id", "entity_id", unique=True),)
+
+
 class AnalysisSnapshot(Base):
     """Cached results of the last analytics run so the UI loads instantly."""
 

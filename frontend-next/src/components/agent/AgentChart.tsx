@@ -241,7 +241,7 @@ function Donut({ pts, unit, width, onPick }: { pts: ChartPoint[]; unit: string; 
       </svg>
       <ul className="min-w-0 flex-1 space-y-1">
         {arcs.map((a, i) => (
-          <li key={i} className={cn("flex items-baseline gap-2 text-[var(--fs-body)]", a.p.entity_id && "cursor-pointer hover:text-pencil")}
+          <li key={i} className={cn("flex items-baseline gap-2 text-[length:var(--fs-body)]", a.p.entity_id && "cursor-pointer hover:text-pencil")}
               onClick={() => onPick(a.p)}>
             <span className="mt-1 h-2.5 w-2.5 shrink-0" style={{ background: a.ink }} aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate" title={a.p.label}>{a.p.label}</span>

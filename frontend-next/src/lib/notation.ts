@@ -7,18 +7,35 @@ import { format } from "date-fns";
 import type { EntityType, Extractor } from "./types";
 
 export const INK = {
-  film: "#EDEDEA",       // drafting-film ground
-  rule: "#DAD9D3",       // faint sheet rules
-  ink: "#1F1F1F",        // technical-pen black
-  inkSoft: "#5B5B57",    // secondary ink
-  inkFaint: "#9A9A94",   // tertiary / receded
-  pencil: "#B03A2E",     // red confirmation pencil: priority, selection, critical
-  pencilSoft: "#D9A39C",
-  blue: "#3A5F8F",       // money lines
-  blueSoft: "#9FB4CC",
-  amber: "#B7791F",      // high severity / warning
-  green: "#4E7A47",      // confirmed / intact
+  film: "#E4E7E4",       // platform terrazzo
+  rule: "#C3C8C3",
+  ink: "#141613",        // board black
+  inkSoft: "#4C534C",
+  inkFaint: "#606760",
+  pencil: "#B02821",     // signal red: stop, critical, selection
+  pencilSoft: "#E39D99",
+  blue: "#1F6FB2",       // money runs on the blue route
+  blueSoft: "#9DC0DD",
+  amber: "#6B4600",      // the only amber that carries text or a mark on the light ground
+  green: "#2E7D4F",
 } as const;
+
+/**
+ * Route colours, one per community, the way a metro map gives each line its own ink.
+ * They ride the edge only; the text field stays achromatic, so colour never becomes the sole
+ * carrier of meaning and a colour-blind reader loses nothing but the grouping shorthand.
+ */
+/**
+ * The route palette. Signal red is deliberately absent: on this map red means stop — a critical
+ * alert or the mark you have selected — and a community that happened to be numbered first is
+ * neither. Six hues, each distinguishable from the others in greyscale weight as well as in hue.
+ */
+export const ROUTE_INKS = ["#1F6FB2", "#2E7D4F", "#8A5A04", "#7A4FA3", "#0F7B8A", "#B5532A"] as const;
+
+export function routeInk(community: number | null | undefined): string {
+  if (community === null || community === undefined) return INK.inkSoft;
+  return ROUTE_INKS[Math.abs(community) % ROUTE_INKS.length];
+}
 
 export type Shape = "circle" | "square" | "diamond" | "hexagon" | "triangle" | "rect" | "pin" | "tag" | "ring";
 
@@ -53,7 +70,7 @@ export function lineStyleFor(extractor?: Extractor | string | null, confidence?:
   if (confidence !== undefined && confidence < 0.7) return "dotted";
   return "dashed";
 }
-export const DASH: Record<LineStyle, number[]> = { solid: [], dashed: [6, 4], dotted: [1.5, 3.5] };
+export const DASH: Record<LineStyle, number[]> = { solid: [], dashed: [11, 3.5], dotted: [1.5, 4] };
 
 /** Ink per relationship family. Money is blue; everything else is pen black, weight carries volume. */
 export const MONEY_RELS = new Set(["TRANSFERRED_TO", "OWNS_ACCOUNT"]);
@@ -84,6 +101,7 @@ export const REL_GROUPS: { key: string; label: string; rels: string[] }[] = [
 ];
 
 export const SEVERITY_INK: Record<string, string> = { critical: INK.pencil, high: INK.amber, medium: INK.inkSoft, low: INK.inkFaint };
+
 export const ALERT_KIND_LABEL: Record<string, string> = {
   burner_phone: "Burner phone", structuring: "Structured deposits", layering: "Layering chain", call_burst: "Call burst",
   night_activity: "Night activity", international_contact: "International contact", behavioural_outlier: "Behavioural outlier",
@@ -93,7 +111,7 @@ export const ALERT_KIND_LABEL: Record<string, string> = {
 
 /** Node radius on the chart: priority carries size; types without scores sit small. */
 export function nodeRadius(type: EntityType, priority: number, degree: number, presentation: boolean): number {
-  const base = type === "PERSON" || type === "ORGANIZATION" ? 5 + priority * 12 : 3.2 + Math.min(degree, 30) * 0.08;
+  const base = type === "PERSON" || type === "ORGANIZATION" ? 6.5 + priority * 15 : 4 + Math.min(degree, 30) * 0.1;
   return presentation ? base * 1.35 : base;
 }
 

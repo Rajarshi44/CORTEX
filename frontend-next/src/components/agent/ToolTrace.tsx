@@ -47,7 +47,7 @@ export default function ToolTrace({ calls, running }: { calls: ToolCall[]; runni
             ? calls[calls.length - 1]?.label
             : `${calls.length} retrieval${calls.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}${external ? ", including external sources" : ""}`}
         </span>
-        {ms > 0 && <span className="figure shrink-0 text-[var(--fs-note)] text-ink-faint">{(ms / 1000).toFixed(1)}s</span>}
+        {ms > 0 && <span className="figure shrink-0 text-[length:var(--fs-note)] text-ink-faint">{(ms / 1000).toFixed(1)}s</span>}
       </button>
 
       {open && (
@@ -68,7 +68,7 @@ export default function ToolTrace({ calls, running }: { calls: ToolCall[]; runni
                 </p>
                 {argSummary(c.input) && <p className="note truncate text-ink-faint">{argSummary(c.input)}</p>}
                 {c.done && c.summary && (
-                  <p className={cn("note", c.ok === false ? "text-pencil" : "text-ink-soft")}>→ {c.summary}</p>
+                  <p className={cn("note border-l border-rule pl-2", c.ok === false ? "text-pencil" : "text-ink-soft")}>{c.summary}</p>
                 )}
               </div>
               {c.ms !== undefined && <span className="figure shrink-0 text-[10px] text-ink-faint">{c.ms}ms</span>}

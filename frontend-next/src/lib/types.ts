@@ -62,6 +62,29 @@ export interface Alert {
 }
 
 /**
+ * A standing watch and the records that matched it.
+ *
+ * Held apart from `Alert` on purpose. An alert is an inference the detectors redraw on every
+ * recompute; a hit is a fact about one document that arrived, and it outlives any recompute.
+ */
+export type WatchKind = "PERSON" | "ORGANIZATION" | "PHONE" | "VEHICLE" | "BANK_ACCOUNT" | "GOV_ID" | "TEXT";
+export type HitStatus = "new" | "reviewing" | "dismissed" | "confirmed";
+
+export interface Watch {
+  id: string; kind: WatchKind; selector: string; reason: string; severity: Severity;
+  active: boolean; created_by: string; created_at: string;
+  last_hit_at: string | null; hit_count: number; new_hits: number;
+}
+
+export interface WatchHit {
+  id: number; watch_id: string; status: HitStatus; matched_on: string; snippet: string;
+  created_at: string; occurred_at: string | null;
+  watch: { kind: WatchKind; selector: string; reason: string; severity: Severity } | null;
+  document: { id: string; title: string; source_type: string } | null;
+  entity: { id: string; label: string; type: EntityType; record_role: string | null; non_subject: boolean } | null;
+}
+
+/**
  * Where a row came from. The API resolves these (backend/app/ingestion/provenance.py);
  * they are optional here so a panel still renders against an older build, falling back to
  * `lib/provenance.ts`. A `source_url` of null means: real source, no public page to open.

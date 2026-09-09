@@ -29,7 +29,7 @@ FIRECRAWL_BASE = "https://api.firecrawl.dev/v2"
 # 403 to a spoofed Chrome UA on a scripted request but serve a declared bot happily, so this is
 # both the polite choice and the one that actually works. The browser headers stay as a fallback
 # for the older portals that sniff for a real browser.
-HONEST_UA = "SUTRA-CNA/1.0 (criminal network analysis console; research use; contact: local operator)"
+HONEST_UA = "CORTEX-CNA/1.0 (criminal network analysis console; research use; contact: local operator)"
 HONEST_HEADERS = {"User-Agent": HONEST_UA,
                   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                   "Accept-Language": "en-IN,en;q=0.8"}

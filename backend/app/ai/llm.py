@@ -143,7 +143,7 @@ def _post(body: dict) -> dict | None:
         return None
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                # OpenRouter attribution headers; harmless elsewhere.
-               "HTTP-Referer": "https://github.com/sutra-cna", "X-Title": "SUTRA Criminal Network Analysis"}
+               "HTTP-Referer": "https://github.com/cortex-cna", "X-Title": "CORTEX Criminal Network Analysis"}
     url = f"{settings.openrouter_base_url.rstrip('/')}/chat/completions"
     delay = 2.0
     for attempt in range(settings.llm_max_retries + 1):

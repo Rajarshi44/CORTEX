@@ -4,29 +4,57 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ------------------------------------------------------------------ the sheet
-   One world: a drafted link chart on drafting film. Every token below is an ink
-   or a material from that world; nothing is a generic UI grey.
+/* Tailwind scans every file under the repo for class candidates, markdown and JSON included. A
+   design document that quotes a class pattern is therefore compiled as a real utility, and a
+   wildcard inside one — `text-[length:var(--fs-*)]` — emits `font-size: var(--fs-*)`, which is
+   not parseable CSS and takes the entire stylesheet, and every route with it, down. Documentation
+   describes the system; it is not a source of it. */
+@source not "../../DESIGN.md";
+@source not "../../README.md";
+@source not "../../../.impeccable";
+@source not "../../../README.md";
+
+/* ------------------------------------------------------------------ the board
+   One world: Indian Railways information design. Platform terrazzo underfoot, one
+   dark board where amber is allowed to burn, route colour on the line edges only.
+   Every token below is a material from that world; nothing is a generic UI grey.
 ------------------------------------------------------------------------- */
 :root {
-  --film: #ededea;
-  --film-deep: #e4e3de;       /* margins, rails */
-  --film-lift: #f4f3ef;       /* raised note paper */
-  --rule: #dad9d3;
-  --rule-strong: #c4c3bb;
-  --ink: #1f1f1f;
-  --ink-soft: #5b5b57;
-  --ink-faint: #9a9a94;
-  --pencil: #b03a2e;
-  --pencil-soft: #d9a39c;
-  --pencil-wash: rgba(176, 58, 46, 0.08);
-  --blue: #3a5f8f;
-  --blue-soft: #9fb4cc;
-  --blue-wash: rgba(58, 95, 143, 0.08);
-  --amber: #b7791f;
-  --green: #4e7a47;
+  /* Platform, not paper. Terrazzo grey concourse under tubelight; the board is the only dark
+     field on the page and the only place amber is allowed to burn. */
+  --film: #e4e7e4;            /* platform terrazzo */
+  --film-deep: #d6dad6;       /* rails, gutters, inset tracks */
+  --film-lift: #eef0ed;       /* raised card, timetable paper */
+  --rule: #c3c8c3;
+  --rule-strong: #a7aea7;
+  --ink: #141613;             /* board black, doubles as type */
+  --ink-soft: #4c534c;
+  --ink-faint: #606760;
 
-  /* shadcn contract, mapped onto the film world */
+  /* signal amber: the lit lamp. Only ever on the board, or on a live status mark. */
+  --amber: #f0a81e;
+  --amber-deep: #6b4600;      /* the only amber allowed to carry text on the light ground */
+  --amber-wash: rgba(240, 168, 30, 0.14);
+
+  /* signal red: stop. Critical alerts, destructive actions, nothing else. */
+  --pencil: #b02821;          /* signal red; kept token name, 200+ call sites */
+  --pencil-soft: #e39d99;
+  --pencil-wash: rgba(200, 50, 43, 0.09);
+
+  /* route colours: one per community, carried on line edges only, never as a fill behind text */
+  --blue: #1f6fb2;
+  --blue-soft: #9dc0dd;
+  --blue-wash: rgba(31, 111, 178, 0.09);
+  --green: #2e7d4f;
+  --violet: #7a4fa3;
+  --route-1: #c8322b;
+  --route-2: #1f6fb2;
+  --route-3: #2e7d4f;
+  --route-4: #b87a06;
+  --route-5: #7a4fa3;
+  --route-6: #0f7b8a;
+
+  /* shadcn contract, mapped onto the platform world */
   --background: var(--film);
   --foreground: var(--ink);
   --card: var(--film-lift);
@@ -58,7 +86,7 @@
   --sidebar-accent-foreground: var(--pencil);
   --sidebar-border: var(--rule);
   --sidebar-ring: var(--pencil);
-  --radius: 2px;
+  --radius: 0px;
 
   /* type scale: fixed rem steps, ratio ~1.2 (Operate) */
   --fs-note: 0.6875rem;   /* 11 */
@@ -127,20 +155,31 @@
   --color-ink-faint: var(--ink-faint);
   --color-pencil: var(--pencil);
   --color-pencil-soft: var(--pencil-soft);
+  --color-pencil-wash: var(--pencil-wash);
+  --color-blue-wash: var(--blue-wash);
   --color-blue: var(--blue);
   --color-blue-soft: var(--blue-soft);
   --color-amber: var(--amber);
+  --color-amber-deep: var(--amber-deep);
+  --color-amber-wash: var(--amber-wash);
   --color-green: var(--green);
+  --color-violet: var(--violet);
+  --color-route-1: var(--route-1);
+  --color-route-2: var(--route-2);
+  --color-route-3: var(--route-3);
+  --color-route-4: var(--route-4);
+  --color-route-5: var(--route-5);
+  --color-route-6: var(--route-6);
 
-  --font-sans: var(--font-barlow), system-ui, sans-serif;
-  --font-condensed: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
-  --font-stencil: var(--font-stencil), var(--font-barlow-condensed), sans-serif;
+  --font-sans: var(--font-archivo), system-ui, sans-serif;
+  --font-condensed: var(--font-archivo-narrow), var(--font-archivo), sans-serif;
+  --font-stencil: var(--font-archivo-narrow), var(--font-archivo), sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
 
-  --radius-sm: 1px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 4px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
 @layer base {
@@ -154,15 +193,15 @@
     font-feature-settings: "tnum" 1, "lnum" 1;
     overscroll-behavior: none;
   }
-  ::selection { background: var(--pencil); color: var(--film); }
+  ::selection { background: var(--amber); color: var(--ink); }
   :focus-visible { outline: 2px solid var(--pencil); outline-offset: 2px; border-radius: 2px; }
   /* the parts we did not draw still carry the world */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--film-deep); }
   ::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 3px solid var(--film-deep); }
-  ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
   * { scrollbar-color: var(--rule-strong) var(--film-deep); scrollbar-width: thin; }
-  input, textarea { caret-color: var(--pencil); }
+  input, textarea { caret-color: var(--amber-deep); }
   a { text-underline-offset: 3px; text-decoration-thickness: 1px; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -170,14 +209,15 @@
 }
 
 @layer components {
-  /* the ruled sheet ground: faint drafting-film grid, reserved for chart and map areas */
+  /* Concourse terrazzo: fine aggregate speckle, not a drafting grid. Two offset dot fields at
+     coprime sizes so no repeat is legible at any zoom. */
   .sheet-ground {
     background-color: var(--film);
     background-image:
-      linear-gradient(to right, color-mix(in srgb, var(--rule) 70%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--rule) 70%, transparent) 1px, transparent 1px);
-    background-size: 48px 48px;
-    background-position: -1px -1px;
+      radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--rule-strong) 34%, transparent) 0.7px, transparent 0.85px),
+      radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--rule) 45%, transparent) 1px, transparent 1.15px);
+    background-size: 22px 22px, 47px 47px;
+    background-position: 0 0, 7px 11px;
   }
   .sheet-plain { background-color: var(--film); }
   .sheet-ground-fine {
@@ -186,22 +226,84 @@
       linear-gradient(to bottom, color-mix(in srgb, var(--rule) 55%, transparent) 1px, transparent 1px);
     background-size: 8px 8px;
   }
-  /* condensed stencil labels: the chart's own lettering */
-  .label { font-family: var(--font-condensed); font-size: var(--fs-label); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  /* station signage caps */
+  .label { font-family: var(--font-condensed); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
   .label-ink { color: var(--ink); }
   .note { font-size: var(--fs-note); color: var(--ink-soft); }
-  .stencil { font-family: var(--font-stencil); letter-spacing: 0.04em; text-transform: uppercase; }
+  .stencil { font-family: var(--font-condensed); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
+  /* the largest lettering on any lens: condensed board caps, the way a platform sign is set */
+  .sign {
+    font-family: var(--font-condensed);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.015em;
+    line-height: 0.92;
+  }
   .figure { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1; }
-  /* margin note: a numbered entry on the sheet's edge */
-  .note-paper { background: var(--film-lift); box-shadow: 0 1px 0 var(--rule-strong), 0 6px 18px -10px rgba(31, 31, 31, 0.35); }
-  /* red pencil emphasis */
+  .note-paper { background: var(--film-lift); box-shadow: 0 1px 0 var(--rule-strong), 0 8px 22px -14px rgba(20, 22, 19, 0.4); }
   .pencil-line { box-shadow: inset 0 -2px 0 var(--pencil); }
+
+  /* The threads strike across the tray once, left to right. No fill-mode on purpose: if the
+     animation never runs the rect keeps its declared full width, so the threads are simply
+     already drawn rather than clipped away to nothing. */
+  @keyframes thread-strike { from { transform: translateX(-100%); } }
+  .thread-wipe { transform-box: fill-box; animation: thread-strike 1100ms cubic-bezier(0.16, 1, 0.3, 1); }
+  @media (prefers-reduced-motion: reduce) { .thread-wipe { animation: none; } }
+
+  /* ---------------------------------------------------------------- the board
+     The one dark field on the page. Amber only burns here. */
+  .board {
+    background: var(--ink);
+    color: var(--amber);
+    font-family: var(--font-condensed);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .board-dim { color: color-mix(in srgb, var(--amber) 78%, var(--ink)); }
+  .board-white { color: #eceee9; }
+  /* the seam across a split-flap character cell */
+  .flap-seam { position: relative; }
+  .flap-seam::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    border-top: 1px solid rgba(0, 0, 0, 0.55); pointer-events: none;
+  }
+
+  /* Status pill: a name and a shape, never colour alone — and the word itself stays ink.
+     A role set in signal red reads as a verdict on the person; the hue belongs on the rule
+     around the word, where it grades the state without pronouncing on anybody. */
+  .status {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    font-family: var(--font-condensed); font-size: var(--fs-note); font-weight: 600;
+    letter-spacing: 0.09em; text-transform: uppercase; padding: 0.05rem 0.3rem;
+    color: var(--ink);
+    border: 1px solid var(--status-tone, var(--rule-strong));
+    box-shadow: inset 2px 0 0 var(--status-tone, var(--rule-strong));
+    padding-left: 0.45rem;
+  }
+
+  /* timetable: the service index and every dense register */
+  .track { border-bottom: 1px solid var(--rule); }
+  .track:hover { background: var(--film-lift); }
+  /* the platform edge: a run of tactile warning studs down a live rail */
+  .platform-edge {
+    background-image: radial-gradient(circle, var(--amber) 1.6px, transparent 1.8px);
+    background-size: 6px 6px; background-repeat: repeat-y; background-position: center top;
+  }
   .hairline { border-color: var(--rule-strong); }
   .register-row { display: grid; grid-template-columns: 2.5rem 5.5rem 1fr 9rem 6rem; align-items: center; column-gap: 0.75rem; }
   .register-row-p { grid-template-columns: 3rem 6.5rem 1fr 10rem 7rem; }
 }
 
 @keyframes ripple-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+/* A status change is a physical event: the top half falls, the new card lands. */
+@keyframes flap-in {
+  0%   { transform: rotateX(-88deg); opacity: 0; }
+  55%  { transform: rotateX(12deg);  opacity: 1; }
+  100% { transform: rotateX(0deg);   opacity: 1; }
+}
+.flap { animation: flap-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: 50% 0%; backface-visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .flap { animation: none; } }
 @keyframes draw { from { stroke-dashoffset: var(--len, 400); } to { stroke-dashoffset: 0; } }
 .ripple-in { animation: ripple-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 

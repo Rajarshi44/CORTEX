@@ -40,7 +40,7 @@ export default function CommandBar() {
       <div className="note-paper w-[min(40rem,92vw)] overflow-hidden border border-ink">
         <div className="flex items-center gap-2 border-b border-rule-strong px-3">
           <Search className="h-4 w-4 text-ink-faint" aria-hidden="true" />
-          <Command.Input value={q} onValueChange={setQ} placeholder="Find a person, phone, vehicle, account… or type a question" className="h-11 w-full bg-transparent text-[var(--fs-lead)] outline-none placeholder:text-ink-faint" />
+          <Command.Input value={q} onValueChange={setQ} placeholder="Find a person, phone, vehicle, account… or type a question" className="h-11 w-full bg-transparent text-[length:var(--fs-lead)] outline-none placeholder:text-ink-faint" />
           <kbd className="label rounded-[2px] border border-rule-strong px-1.5 py-0.5 text-ink-faint">esc</kbd>
         </div>
         <Command.List className="max-h-[52vh] overflow-y-auto p-1.5">
@@ -52,7 +52,7 @@ export default function CommandBar() {
                   <Glyph shape={SHAPE[n.type]} size={14} />
                   <span className="flex-1 truncate">{n.label}{n.aliases?.length ? <span className="text-ink-faint"> @ {n.aliases.join(", ")}</span> : null}</span>
                   <span className="label text-ink-faint">{TYPE_LABEL[n.type]}</span>
-                  {n.priority > 0 && <span className="figure text-[var(--fs-note)] text-pencil">{n.priority.toFixed(2)}</span>}
+                  {n.priority > 0 && <span className="figure text-[length:var(--fs-note)] text-pencil">{n.priority.toFixed(2)}</span>}
                 </Command.Item>
               ))}
             </Command.Group>

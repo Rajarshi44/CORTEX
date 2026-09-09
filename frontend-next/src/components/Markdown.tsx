@@ -22,11 +22,11 @@ export default function Markdown({ text, className }: { text: string; className?
     if (l.startsWith("|")) {
       const rows: string[][] = [];
       while (i < lines.length && lines[i].startsWith("|")) { const cells = lines[i].trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()); if (!cells.every((c) => /^:?-+:?$/.test(c))) rows.push(cells); i++; }
-      out.push(<div key={i} className="my-2 overflow-x-auto"><table className="w-full border-collapse text-[var(--fs-note)]"><thead><tr>{rows[0]?.map((c, j) => <th key={j} className="label border-b border-ink px-2 py-1 text-left">{inline(c, `h${j}`)}</th>)}</tr></thead><tbody>{rows.slice(1).map((r, ri) => <tr key={ri} className="border-b border-rule">{r.map((c, j) => <td key={j} className="figure px-2 py-1 align-top">{inline(c, `c${ri}${j}`)}</td>)}</tr>)}</tbody></table></div>);
+      out.push(<div key={i} className="my-2 overflow-x-auto"><table className="w-full border-collapse text-[length:var(--fs-note)]"><thead><tr>{rows[0]?.map((c, j) => <th key={j} className="label border-b border-ink px-2 py-1 text-left">{inline(c, `h${j}`)}</th>)}</tr></thead><tbody>{rows.slice(1).map((r, ri) => <tr key={ri} className="border-b border-rule">{r.map((c, j) => <td key={j} className="figure px-2 py-1 align-top">{inline(c, `c${ri}${j}`)}</td>)}</tr>)}</tbody></table></div>);
       continue;
     }
     const h = /^(#{1,3})\s+(.*)$/.exec(l);
-    if (h) { const lvl = h[1].length; out.push(lvl === 1 ? <h1 key={i} className="mt-4 text-[var(--fs-sheet)] font-semibold leading-tight">{inline(h[2], `H${i}`)}</h1> : lvl === 2 ? <h2 key={i} className="label label-ink mt-4 border-b border-rule-strong pb-1">{inline(h[2], `H${i}`)}</h2> : <h3 key={i} className="mt-3 font-semibold">{inline(h[2], `H${i}`)}</h3>); i++; continue; }
+    if (h) { const lvl = h[1].length; out.push(lvl === 1 ? <h1 key={i} className="mt-4 text-[length:var(--fs-sheet)] font-semibold leading-tight">{inline(h[2], `H${i}`)}</h1> : lvl === 2 ? <h2 key={i} className="label label-ink mt-4 border-b border-rule-strong pb-1">{inline(h[2], `H${i}`)}</h2> : <h3 key={i} className="mt-3 font-semibold">{inline(h[2], `H${i}`)}</h3>); i++; continue; }
     if (/^\s*(?:[-*]|\d+\.)\s+/.test(l)) {
       const items: string[] = []; const ordered = /^\s*\d+\./.test(l);
       while (i < lines.length && /^\s*(?:[-*]|\d+\.)\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*(?:[-*]|\d+\.)\s+/, "")); i++; }

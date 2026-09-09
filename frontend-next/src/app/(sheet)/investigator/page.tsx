@@ -15,7 +15,6 @@ import { CornerDownLeft, Square, RotateCcw, FileText, Globe, ArrowUp } from "luc
 import { agentApi, streamAgent, type AgentEvent, type Citation, type HighlightNode, type ToolCall, type Visual } from "@/lib/agent";
 import { useSheet } from "@/lib/store";
 import Markdown from "@/components/Markdown";
-import SheetFooter from "@/components/sheet/SheetFooter";
 import { Glyph } from "@/components/sheet/KeyRail";
 import VisualBlock from "@/components/agent/Visual";
 import ToolTrace from "@/components/agent/ToolTrace";
@@ -174,7 +173,7 @@ function Investigator() {
               <li key={t.id} className="scroll-mt-4">
                 <div className="flex items-baseline gap-2">
                   <span className="label shrink-0 text-ink-faint">Q · {String(i + 1).padStart(2, "0")}</span>
-                  <h2 className="text-[var(--fs-lead)] font-semibold leading-snug">{t.q}</h2>
+                  <h2 className="text-[length:var(--fs-lead)] font-semibold leading-snug">{t.q}</h2>
                 </div>
 
                 <div className="mt-2 border-l border-ink pl-3.5">
@@ -184,7 +183,7 @@ function Investigator() {
                     <VisualBlock key={vi} visual={v} index={vi} onPick={select} />
                   ))}
 
-                  {t.text && <Markdown text={t.text} className="max-w-[74ch] text-[var(--fs-body)] leading-relaxed" />}
+                  {t.text && <Markdown text={t.text} className="max-w-[74ch] text-[length:var(--fs-body)] leading-relaxed" />}
 
                   {t.running && !t.text && !t.calls.length && (
                     <p className="note animate-pulse">Reading the sheet…</p>
@@ -192,7 +191,7 @@ function Investigator() {
                   {t.running && t.text && <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-pencil align-text-bottom" aria-hidden="true" />}
 
                   {t.error && (
-                    <p className="mt-1 border-l-2 border-pencil bg-pencil-wash px-2 py-1.5 text-pencil">{t.error}</p>
+                    <p className="mt-1 border-l border-pencil bg-pencil-wash px-2 py-1.5 text-pencil">{t.error}</p>
                   )}
                   {t.stopped && <p className="note mt-1 text-ink-faint">Stopped.</p>}
 
@@ -201,7 +200,6 @@ function Investigator() {
               </li>
             ))}
           </ol>
-          <SheetFooter lens="Investigator" />
         </div>
 
         {!atBottom && turns.length > 0 && (
@@ -222,7 +220,7 @@ function Investigator() {
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(e); } }}
             placeholder={noProvider ? "Set a model key to ask questions" : "Ask anything about this case — the agent will search, compute and draw"}
             aria-label="Question" disabled={!!noProvider}
-            className="max-h-[132px] min-h-[38px] flex-1 resize-none self-center bg-transparent py-2 text-[var(--fs-lead)] outline-none placeholder:text-ink-faint disabled:opacity-50"
+            className="max-h-[132px] min-h-[38px] flex-1 resize-none self-center bg-transparent py-2 text-[length:var(--fs-lead)] outline-none placeholder:text-ink-faint disabled:opacity-50"
           />
           {running ? (
             <button type="button" onClick={stop} className="label mb-1.5 flex shrink-0 items-center gap-1 rounded-[2px] border border-ink px-2.5 py-1.5 hover:bg-film-deep">
@@ -250,7 +248,7 @@ function Header({ caps }: { caps?: { llm: boolean; provider: { label: string; mo
   return (
     <div className="border-b border-ink pb-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-[var(--fs-sheet)] font-semibold leading-none tracking-tight">Investigator</h1>
+        <h1 className="text-[length:var(--fs-sheet)] font-semibold leading-none tracking-tight">Investigator</h1>
         {caps && (
           <p className="label text-ink-faint">
             {caps.llm && caps.provider ? <>agent · {caps.provider.label} <span className="figure normal-case tracking-normal">{caps.provider.model}</span></> : "no model configured"}
@@ -274,7 +272,7 @@ function Empty({ examples, onPick, disabled, caps }: {
   return (
     <div>
       {disabled && (
-        <div className="mb-4 border-l-2 border-pencil bg-pencil-wash px-3 py-2">
+        <div className="mb-4 border-l border-pencil bg-pencil-wash px-3 py-2">
           <p className="label label-ink">No model provider configured</p>
           <p className="mt-1 leading-snug">
             Add one key to <code className="figure bg-film-deep px-1">backend/.env</code> and restart the API:{" "}
@@ -296,7 +294,7 @@ function Empty({ examples, onPick, disabled, caps }: {
       <div className="grid gap-2 sm:grid-cols-2">
         {examples.map((ex) => (
           <button key={ex} type="button" onClick={() => onPick(ex)} disabled={disabled}
-                  className="note-paper flex items-center justify-between gap-3 px-3 py-2.5 text-left text-[var(--fs-body)] hover:border-ink disabled:opacity-40">
+                  className="note-paper flex items-center justify-between gap-3 px-3 py-2.5 text-left text-[length:var(--fs-body)] hover:border-ink disabled:opacity-40">
             <span>{ex}</span>
             <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" />
           </button>
@@ -305,7 +303,7 @@ function Empty({ examples, onPick, disabled, caps }: {
       {caps?.tools?.length ? (
         <div className="mt-4">
           <button type="button" onClick={() => setShowTools((v) => !v)} className="label text-ink-faint hover:text-ink">
-            {showTools ? "Hide" : "Show"} the {caps.tools.length} tools it can reach →
+            {showTools ? "Hide" : "Show"} the {caps.tools.length} tools it can reach
           </button>
           {showTools && (
             <ul className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">
@@ -339,14 +337,14 @@ function Footer({ turn, onSelect, onHighlight, onFollowUp }: {
           <span className="label shrink-0 text-ink-faint">Entities</span>
           {turn.highlights.slice(0, 14).map((n) => (
             <button key={n.id} type="button" onClick={() => onSelect(n.id)}
-                    className="flex items-center gap-1 border border-rule-strong px-1.5 py-0.5 text-[var(--fs-note)] hover:border-ink">
+                    className="flex items-center gap-1 border border-rule-strong px-1.5 py-0.5 text-[length:var(--fs-note)] hover:border-ink">
               <Glyph shape={SHAPE[n.type]} size={11} />{n.label}
             </button>
           ))}
           {turn.highlights.length > 14 && <span className="note text-ink-faint">+{turn.highlights.length - 14} more</span>}
           <Link href={`/chart?focus=${turn.highlights[0].id}`}
                 onClick={() => onHighlight(turn.highlights.map((h) => h.id), turn.q)}
-                className="label text-pencil hover:underline">show on chart →</Link>
+                className="label text-pencil hover:underline">show on chart</Link>
         </div>
       )}
 
@@ -357,7 +355,7 @@ function Footer({ turn, onSelect, onHighlight, onFollowUp }: {
               <span className="label shrink-0 text-ink-faint"><FileText className="mr-1 inline h-3 w-3" aria-hidden="true" />Sources</span>
               {docs.slice(0, 5).map((c) => (
                 <span key={c.id} title={c.snippet}
-                      className="max-w-[240px] truncate border-b border-dotted border-rule-strong text-[var(--fs-note)] text-ink-soft">
+                      className="max-w-[240px] truncate border-b border-dotted border-rule-strong text-[length:var(--fs-note)] text-ink-soft">
                   {c.source_type} · {c.title}
                 </span>
               ))}
@@ -368,7 +366,7 @@ function Footer({ turn, onSelect, onHighlight, onFollowUp }: {
               <span className="label shrink-0 text-ink-faint"><Globe className="mr-1 inline h-3 w-3" aria-hidden="true" />Open web</span>
               {webs.slice(0, 4).map((c) => (
                 <a key={c.id} href={c.id} target="_blank" rel="noreferrer noopener" title={c.snippet}
-                   className="max-w-[220px] truncate text-[var(--fs-note)] text-blue underline decoration-dotted">
+                   className="max-w-[220px] truncate text-[length:var(--fs-note)] text-blue underline decoration-dotted">
                   {c.title || c.id}
                 </a>
               ))}

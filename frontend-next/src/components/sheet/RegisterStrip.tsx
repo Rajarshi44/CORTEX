@@ -18,7 +18,7 @@ export default function RegisterStrip({ compact = false }: { compact?: boolean }
     <section aria-label="Open alerts register" className="note-paper w-[min(30rem,42vw)]">
       <header className="flex items-center justify-between border-b border-rule-strong px-3 py-1.5">
         <h2 className="label label-ink">Register of open alerts</h2>
-        <div className="flex items-center gap-2 figure text-[var(--fs-note)]">
+        <div className="flex items-center gap-2 figure text-[length:var(--fs-note)]">
           {(["critical", "high", "medium", "low"] as const).map((s) => counts[s] ? (
             <span key={s} className="inline-flex items-center gap-1" style={{ color: SEVERITY_INK[s] }}>
               <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full" style={{ background: SEVERITY_INK[s] }} />{counts[s]} {s}
@@ -38,7 +38,7 @@ export default function RegisterStrip({ compact = false }: { compact?: boolean }
             >
               <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: SEVERITY_INK[a.severity] }} />
               <span className={cn("label truncate", a.severity === "critical" && "text-pencil")}>{ALERT_KIND_LABEL[a.kind] ?? a.kind}</span>
-              <span className="truncate text-[var(--fs-note)] text-ink">{a.title}</span>
+              <span className="truncate text-[length:var(--fs-note)] text-ink">{a.title}</span>
               <span className="sr-only">, severity {a.severity}</span>
             </button>
           </li>

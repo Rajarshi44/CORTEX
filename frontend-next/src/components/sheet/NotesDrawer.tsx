@@ -25,7 +25,7 @@ import { format } from "date-fns";
 const TABS = ["Record", "Links", "Evidence", "Associates", "Money", "Calls", "Timeline", "Notes"] as const;
 
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
-  return <div className="grid grid-cols-[7.5rem_1fr] gap-2 py-0.5 text-[var(--fs-body)]"><dt className="label text-ink-faint">{k}</dt><dd className="figure min-w-0 break-words text-ink">{v}</dd></div>;
+  return <div className="grid grid-cols-[7.5rem_1fr] gap-2 py-0.5 text-[length:var(--fs-body)]"><dt className="label text-ink-faint">{k}</dt><dd className="figure min-w-0 break-words text-ink">{v}</dd></div>;
 }
 
 /** A safe date, or nothing. Sources leave dates out far more often than they get them wrong. */
@@ -57,7 +57,7 @@ function EvidenceNote({ e, i }: { e: Evidence; i: number }) {
   const at = when(e.at);
   return (
     <li className="border-b border-rule py-2 last:border-b-0">
-      <blockquote className="border-l border-rule-strong pl-2 text-[var(--fs-body)] leading-snug text-ink">“{(e.snippet ?? "").trim()}”</blockquote>
+      <blockquote className="border-l border-rule-strong pl-2 text-[length:var(--fs-body)] leading-snug text-ink">“{(e.snippet ?? "").trim()}”</blockquote>
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-2">
         <span className="figure label text-ink-faint">{String(i + 1).padStart(2, "0")}</span>
         <LineSample style={style} width={20} />
@@ -81,7 +81,7 @@ function DocumentRow({ d }: { d: DossierDocument }) {
     <li className="border-b border-rule py-1.5 last:border-b-0">
       <div className="flex items-baseline gap-2">
         <span className="label shrink-0 text-ink-faint">{d.source_type}</span>
-        <Link href={`/sources?doc=${d.id}`} className="min-w-0 flex-1 truncate text-[var(--fs-body)] text-ink hover:text-pencil">{d.title}</Link>
+        <Link href={`/sources?doc=${d.id}`} className="min-w-0 flex-1 truncate text-[length:var(--fs-body)] text-ink hover:text-pencil">{d.title}</Link>
         {at && <span className="figure note shrink-0">{at}</span>}
       </div>
       <p className="pl-1 note">{sourceLabel(d.source_type, d.source_name)} · <SourceLink title={href ? "open the source" : "no public page"} href={href} /></p>
@@ -104,7 +104,7 @@ function NoteItem({ n, eId }: { n: Note; eId: string }) {
           <span className="label text-ink">{n.username}</span>
           <span className="figure note">{when(n.created_at, "dd MMM HH:mm")}</span>
         </div>
-        <textarea value={editText} onChange={e => setEditText(e.target.value)} className="w-full mt-1 bg-film text-ink border border-rule-strong p-1 text-[var(--fs-body)] resize-none" />
+        <textarea value={editText} onChange={e => setEditText(e.target.value)} className="w-full mt-1 bg-film text-ink border border-rule-strong p-1 text-[length:var(--fs-body)] resize-none" />
         <div className="mt-1 flex gap-2">
           <button onClick={() => { updateNote.mutate({ entityId: eId, noteId: n.id, text: editText }, { onSuccess: () => setIsEditing(false) }) }} disabled={updateNote.isPending} className="label text-ink hover:text-pencil">Save</button>
           <button onClick={() => setIsEditing(false)} className="label text-ink-faint hover:text-ink">Cancel</button>
@@ -127,7 +127,7 @@ function NoteItem({ n, eId }: { n: Note; eId: string }) {
           </div>
         )}
       </div>
-      <p className="mt-0.5 text-[var(--fs-body)] text-ink-faint whitespace-pre-wrap">{n.text}</p>
+      <p className="mt-0.5 text-[length:var(--fs-body)] text-ink-faint whitespace-pre-wrap">{n.text}</p>
     </li>
   );
 }
@@ -176,7 +176,7 @@ export default function NotesDrawer() {
       <header className="flex items-start gap-2 border-b border-ink px-3 py-2">
         {e ? <Glyph shape={SHAPE[e.type]} size={18} stroke={e.type === "BANK_ACCOUNT" ? INK.blue : INK.ink} className="mt-1 shrink-0" /> : <span className="h-4 w-4" />}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[var(--fs-title)] font-semibold leading-tight text-ink">{e?.label ?? (isLoading ? "Loading note…" : "—")}</h2>
+          <h2 className="truncate text-[length:var(--fs-title)] font-semibold leading-tight text-ink">{e?.label ?? (isLoading ? "Loading note…" : "—")}</h2>
           <p className="note truncate">{e ? [TYPE_LABEL[e.type], e.aliases?.length ? `@ ${e.aliases.join(", ")}` : null, e.role].filter(Boolean).join(" · ") : ""}</p>
         </div>
         <button type="button" onClick={() => { setOpen(false); select(null); }} aria-label="Close notes" className="rounded-[2px] p-1 text-ink-soft hover:bg-film-deep hover:text-ink"><X className="h-4 w-4" /></button>
@@ -184,7 +184,7 @@ export default function NotesDrawer() {
       {e && (e.type === "PERSON" || e.type === "ORGANIZATION") && (
         <div className="grid grid-cols-3 divide-x divide-rule border-b border-rule-strong">
           {([["Priority", e.priority, INK.pencil], ["Influence", e.influence, INK.ink], ["Suspicion", e.suspicion, INK.amber]] as const).map(([k, v, c]) => (
-            <div key={k} className="px-3 py-1.5"><div className="label text-ink-faint">{k}</div><div className="figure text-[var(--fs-title)] font-semibold" style={{ color: c }}>{v.toFixed(2)}</div></div>
+            <div key={k} className="px-3 py-1.5"><div className="label text-ink-faint">{k}</div><div className="figure text-[length:var(--fs-title)] font-semibold" style={{ color: c }}>{v.toFixed(2)}</div></div>
           ))}
         </div>
       )}
@@ -204,8 +204,8 @@ export default function NotesDrawer() {
 
         {d && e && tab === "Record" && (
           <div className="mt-2">
-            {e.role_reasons?.length > 0 && <section className="mb-3"><h3 className="label">Why this role</h3><ul className="mt-1 list-disc pl-4 text-[var(--fs-body)] text-ink">{e.role_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></section>}
-            {e.suspicion_reasons?.length > 0 && <section className="mb-3"><h3 className="label">Suspicion signals</h3><ul className="mt-1 list-disc pl-4 text-[var(--fs-body)] text-ink">{e.suspicion_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></section>}
+            {e.role_reasons?.length > 0 && <section className="mb-3"><h3 className="label">Why this role</h3><ul className="mt-1 list-disc pl-4 text-[length:var(--fs-body)] text-ink">{e.role_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></section>}
+            {e.suspicion_reasons?.length > 0 && <section className="mb-3"><h3 className="label">Suspicion signals</h3><ul className="mt-1 list-disc pl-4 text-[length:var(--fs-body)] text-ink">{e.suspicion_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></section>}
 
             <section className="mb-4">
               <h3 className="label border-b border-rule pb-1">On the chart</h3>
@@ -245,7 +245,7 @@ export default function NotesDrawer() {
                   {d.alerts.map((a) => (
                     <li key={a.id} className="flex items-center gap-2 py-1.5">
                       <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: SEVERITY_INK[a.severity] }} />
-                      <span className="min-w-0 flex-1 text-[var(--fs-body)]">{ALERT_KIND_LABEL[a.kind] ?? a.kind}: {a.title}</span>
+                      <span className="min-w-0 flex-1 text-[length:var(--fs-body)]">{ALERT_KIND_LABEL[a.kind] ?? a.kind}: {a.title}</span>
                       <select aria-label="Alert status" value={a.status} onChange={(ev) => patch.mutate({ id: a.id, status: ev.target.value as "open" })} className="label border border-rule-strong bg-film px-1 py-0.5">
                         {["open", "reviewing", "confirmed", "dismissed"].map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
@@ -258,7 +258,7 @@ export default function NotesDrawer() {
             {d.removal_impact && (
               <section className="mb-4 border border-pencil-soft bg-[var(--pencil-wash)] p-2">
                 <h3 className="label text-pencil">If removed</h3>
-                <p className="mt-1 text-[var(--fs-body)] text-ink">Cuts <span className="figure font-semibold">{Math.round((d.removal_impact.flow_share ?? 0) * 100)}%</span> of this community’s interaction volume; fragments it by <span className="figure font-semibold">{Math.round((d.removal_impact.community_fragmentation ?? 0) * 100)}%</span>{d.removal_impact.isolated_after?.length ? <>; isolates {d.removal_impact.isolated_after.map((x) => x.label).join(", ")}</> : null}.</p>
+                <p className="mt-1 text-[length:var(--fs-body)] text-ink">Cuts <span className="figure font-semibold">{Math.round((d.removal_impact.flow_share ?? 0) * 100)}%</span> of this community’s interaction volume; fragments it by <span className="figure font-semibold">{Math.round((d.removal_impact.community_fragmentation ?? 0) * 100)}%</span>{d.removal_impact.isolated_after?.length ? <>; isolates {d.removal_impact.isolated_after.map((x) => x.label).join(", ")}</> : null}.</p>
               </section>
             )}
 
@@ -286,7 +286,7 @@ export default function NotesDrawer() {
                       <li key={`${r.other.id}-${i}`} className="border-b border-rule py-1.5 last:border-b-0">
                         <button type="button" onClick={() => select(r.other.id)} className="flex w-full items-center gap-2 text-left hover:text-pencil">
                           <Glyph shape={SHAPE[r.other.type]} size={13} stroke={r.other.type === "BANK_ACCOUNT" ? INK.blue : INK.ink} />
-                          <span className="min-w-0 flex-1 truncate text-[var(--fs-body)]">{r.other.label}</span>
+                          <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)]">{r.other.label}</span>
                           {r.count > 1 && <span className="figure note shrink-0">{r.count}×</span>}
                         </button>
                         <p className="note pl-7">
@@ -333,7 +333,7 @@ export default function NotesDrawer() {
                 <button type="button" onClick={() => select(a.other.id)} className="flex w-full items-center gap-2 text-left hover:text-pencil">
                   <span className="figure label text-ink-faint">{String(i + 1).padStart(2, "0")}</span>
                   <Glyph shape={SHAPE[a.other.type]} size={13} />
-                  <span className="min-w-0 flex-1 truncate text-[var(--fs-body)]">{a.other.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)]">{a.other.label}</span>
                   <span className="figure note">{a.weight.toFixed(1)}</span>
                 </button>
                 <p className="note pl-7">{Object.entries(a.channels).map(([k, v]) => `${k} ${v}`).join(" · ")}{a.amount ? ` · ${fmtInr(a.amount)}` : ""}{a.night_calls ? ` · ${a.night_calls} night` : ""}</p>
@@ -344,7 +344,7 @@ export default function NotesDrawer() {
         )}
 
         {d && tab === "Money" && d.money && (
-          <div className="mt-2 text-[var(--fs-body)]">
+          <div className="mt-2 text-[length:var(--fs-body)]">
             <dl><Row k="Accounts" v={d.money.accounts.join(", ") || "—"} /><Row k="Inbound" v={fmtInr(d.money.total_in)} /><Row k="Outbound" v={fmtInr(d.money.total_out)} /></dl>
             <h3 className="label mt-3">Top sources</h3><ul className="mt-1">{d.money.top_sources.map(([s, v]) => <li key={s} className="flex justify-between border-b border-rule py-1"><span className="truncate">{s}</span><span className="figure text-blue">{fmtInr(v)}</span></li>)}</ul>
             <h3 className="label mt-3">Top destinations</h3><ul className="mt-1">{d.money.top_destinations.map(([s, v]) => <li key={s} className="flex justify-between border-b border-rule py-1"><span className="truncate">{s}</span><span className="figure text-blue">{fmtInr(v)}</span></li>)}</ul>
@@ -352,7 +352,7 @@ export default function NotesDrawer() {
         )}
 
         {d && tab === "Calls" && d.calls && (
-          <div className="mt-2 text-[var(--fs-body)]">
+          <div className="mt-2 text-[length:var(--fs-body)]">
             <dl><Row k="Numbers" v={d.calls.phones.join(", ")} /><Row k="Calls" v={d.calls.total_calls} /><Row k="At night" v={`${Math.round(d.calls.night_ratio * 100)}%`} /></dl>
             <h3 className="label mt-3">By hour</h3>
             <div className="mt-1 flex h-12 items-end gap-px" aria-label="Calls by hour of day">{d.calls.by_hour.map((v, h) => { const m = Math.max(1, ...d.calls!.by_hour); return <div key={h} title={`${h}:00 — ${v}`} className={cn("flex-1", h >= 23 || h < 5 ? "bg-pencil" : "bg-ink")} style={{ height: `${(v / m) * 100}%`, opacity: v ? 1 : 0.15 }} />; })}</div>
@@ -364,7 +364,7 @@ export default function NotesDrawer() {
         {d && tab === "Timeline" && (
           <ol className="mt-1">
             {d.timeline.slice().reverse().slice(0, 80).map((t) => (
-              <li key={t.id} className="grid grid-cols-[5.5rem_1fr] gap-2 border-b border-rule py-1.5 text-[var(--fs-note)]"><span className="figure text-ink-faint">{when(t.at, "dd MMM HH:mm")}</span><span className="text-ink"><span className="label mr-1 text-ink-faint">{t.kind}</span>{t.summary}</span></li>
+              <li key={t.id} className="grid grid-cols-[5.5rem_1fr] gap-2 border-b border-rule py-1.5 text-[length:var(--fs-note)]"><span className="figure text-ink-faint">{when(t.at, "dd MMM HH:mm")}</span><span className="text-ink"><span className="label mr-1 text-ink-faint">{t.kind}</span>{t.summary}</span></li>
             ))}
             {!d.timeline.length && <li className="note py-3">No dated events are recorded for this entity.</li>}
           </ol>
@@ -389,7 +389,7 @@ export default function NotesDrawer() {
                 value={noteText}
                 onChange={(ev) => setNoteText(ev.target.value)}
                 placeholder="Write a note..."
-                className="w-full bg-film text-ink border border-rule-strong p-2 text-[var(--fs-body)] focus:outline-none focus:border-ink resize-none min-h-[60px]"
+                className="w-full bg-film text-ink border border-rule-strong p-2 text-[length:var(--fs-body)] focus:outline-none focus:border-ink resize-none min-h-[60px]"
               />
               <div className="mt-2 flex justify-end">
                 <button type="submit" disabled={!noteText.trim() || addNote.isPending} className="bg-ink text-film label px-3 py-1 hover:opacity-80 disabled:opacity-50">

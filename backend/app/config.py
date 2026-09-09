@@ -46,7 +46,7 @@ _load_dotenv_into_environ(BASE_DIR / ".env")
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CNA_", env_file=BASE_DIR / ".env", extra="ignore")
 
-    app_name: str = "Criminal Network Analysis System"
+    app_name: str = "CORTEX - Criminal Organization Relationship & Threat Explorer"
     environment: str = "development"
     database_url: str = f"sqlite:///{(BASE_DIR / 'data' / 'cna.db').as_posix()}"
     data_dir: Path = BASE_DIR / "data"

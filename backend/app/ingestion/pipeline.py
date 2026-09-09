@@ -82,6 +82,7 @@ class IngestStats:
     identifiers_found: int = 0
     identifiers_rejected: int = 0
     sealed: int = 0
+    watch_hits: int = 0
     warnings: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -119,6 +120,9 @@ class IngestionService:
         self.neural_labels = neural_labels
         self.actor = actor
         self.seal_documents = settings.evidence_ledger_enabled if seal_documents is None else seal_documents
+        # Documents added since the last flush. Standing watches are checked against these and only
+        # these, so a harvest of one new article does not rescan the whole corpus.
+        self._run_doc_ids: list[str] = []
         self._refresh_dictionary()
 
     # ------------------------------------------------------------------ utils
@@ -130,6 +134,7 @@ class IngestionService:
         d = Document(id=str(uuid.uuid4()), source_type=source_type, title=title[:300], content=content, meta=meta or {},
                      occurred_at=occurred_at, record_count=records)
         self.db.add(d)
+        self._run_doc_ids.append(d.id)
         self.stats.documents += 1
         if self.seal_documents:
             # tamper-evident chain of custody: seal the document at the moment of collection
@@ -179,11 +184,33 @@ class IngestionService:
         self.stats.entities_created = self.resolver.new_entities
         self.stats.entities_merged = self.resolver.merges
         self.db.commit()
+        self._fire_watches()
         for snap in self.db.query(AnalysisSnapshot).all():
             snap.stale = True
         self.db.commit()
         graph_cache.invalidate()
         self._refresh_dictionary()
+
+    def _fire_watches(self):
+        """Check the records that just arrived against every standing watch.
+
+        Runs after the entities and evidence of this batch are committed and before the snapshot is
+        marked stale, because a watch is about one document landing rather than about the shape of
+        the corpus - it must not wait for the next analytics recompute. A failure here is recorded
+        as a warning and never fails the ingestion: losing an alert is bad, losing the record it
+        would have fired on is worse.
+        """
+        doc_ids, self._run_doc_ids = self._run_doc_ids, []
+        if not doc_ids:
+            return
+        try:
+            from ..watch.matcher import scan
+
+            self.stats.watch_hits += len(scan(self.db, doc_ids))
+        except Exception as exc:  # pragma: no cover - a watch must never break a harvest
+            self.db.rollback()
+            log.warning("standing-watch scan failed: %s", exc)
+            self.stats.warnings.append(f"standing-watch scan failed: {exc}")
 
     # ------------------------------------------------------------------ unstructured text (FIR / INTEL / free text)
     def _apply_extraction(self, doc: Document, text: str, res: ExtractionResult, when: datetime | None,

@@ -5,7 +5,7 @@ import { useSheet } from "@/lib/store";
 export default function Narrative() {
   const narrative = useSheet((s) => s.narrative);
   return (
-    <p aria-live="polite" aria-atomic="true" className="pointer-events-none max-w-[48ch] text-[var(--fs-note)] italic leading-snug text-ink-soft">
+    <p aria-live="polite" aria-atomic="true" className="pointer-events-none max-w-[48ch] text-[length:var(--fs-note)] italic leading-snug text-ink-soft">
       {narrative}
     </p>
   );

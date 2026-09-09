@@ -1,13 +1,13 @@
-# SUTRA — AI-Powered Criminal Network Analysis
+# CORTEX — Criminal Organization Relationship & Threat EXplorer
 
 **SIH 26189 · Ministry of Home Affairs / NCRB · Women Safety Division**
 
 Crime information is scattered. The phone log sits with a telecom operator, the transfer with a
 bank, the judgment with a court, the wanted notice on a police website. No single office sees all
-of it, so a criminal network stays invisible. SUTRA collects those pieces, joins them, draws one
+of it, so a criminal network stays invisible. CORTEX collects those pieces, joins them, draws one
 map, and says who matters on it and why.
 
-Nothing on a SUTRA sheet asserts guilt. Every line is backed by a document and a sentence, and
+Nothing on a CORTEX sheet asserts guilt. Every line is backed by a document and a sentence, and
 every score decomposes into reasons you can read.
 
 ---
@@ -106,6 +106,17 @@ Everything is under `backend/app/`.
 | `queries.py` | Everything the API reads: entity dossiers, paths, timelines, money and call profiles |
 | `case_linkage.py` | Behavioural linkage — which offences may share an offender |
 
+### `watch/` — standing queries
+| File | Its one job |
+|------|-------------|
+| `matcher.py` | Selector normalisation, and the scan that fires a watch on every arriving record |
+
+A detector reads the whole sheet and is redrawn on every recompute. A watch does the opposite: it
+names one selector - a person, organisation, phone, vehicle, account, government identifier or a
+literal phrase - and checks it against each record as that record arrives, keeping the hit with the
+document that caused it. Arming a watch also searches everything already held, so *has this ever
+appeared* is answered immediately rather than only from the next harvest.
+
 ### `ai/` — optional language-model tier
 | File | Its one job |
 |------|-------------|
@@ -115,7 +126,7 @@ Everything is under `backend/app/`.
 
 ### `api/` — the HTTP surface
 One router per area: `routes_auth`, `routes_graph`, `routes_ingest`, `routes_intel`,
-`routes_sources`, `routes_ai`, `routes_forensics`. `deps.py` holds the analysis service that
+`routes_sources`, `routes_ai`, `routes_forensics`, `routes_watch`. `deps.py` holds the analysis service that
 computes the snapshot once and caches it.
 
 ---
@@ -129,7 +140,7 @@ Under `frontend-next/src/`. Next.js App Router.
 | `app/(sheet)/page.tsx` | Overview — the sheet's front matter |
 | `app/(sheet)/chart/page.tsx` | The link chart |
 | `app/(sheet)/players/page.tsx` | Key players, brokers, communities, disruption |
-| `app/(sheet)/alerts/page.tsx` | The register of detector findings |
+| `app/(sheet)/alerts/page.tsx` | The register of detector findings, and the standing watches that fire on arrival |
 | `app/(sheet)/map/page.tsx` | Geography |
 | `app/(sheet)/investigator/page.tsx` | Ask questions in plain language |
 | `app/(sheet)/sources/page.tsx` | What is on the sheet, and how to add more |
@@ -175,6 +186,14 @@ that history was not silently rewritten. A chain gives that at zero cost.
 relation on, and the quote is checked against the source text. Anything unverifiable is dropped, so
 a hallucinated relationship cannot be stored. Per-document extraction is off by default because
 one call costs tens of seconds.
+
+**A watch is not an alert.** A detector alert is an inference over the whole corpus, so it is
+recomputed and replaced whenever the corpus changes. A watch hit is a fact about one document that
+arrived, so it is written once and never touched again - an analyst's decision on it survives every
+recompute. They are stored in separate tables for that reason, and shown as separate registers.
+Matching is exact on the resolver's canonical key: that rules out a watch silently widening into a
+fuzzy name search, but it cannot rule out a namesake, which is why a hit shows the record and lets
+the analyst judge rather than asserting an identity.
 
 **Scores never come from a model.** Centralities, communities and ranking are deterministic
 mathematics, so "why is this person ranked highest" always has an arithmetic answer.

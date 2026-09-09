@@ -2,17 +2,21 @@ import type {
   AiStatus, Alert, AlertStatus, AssistantAnswer, Community, DocumentDetail, DocumentSummary, Dossier, GeoPayload,
   EntityPage, GraphPayload, IngestStatus, KeyPlayer, Broker, LedgerVerify, LinkPrediction, LinkageReport, NodeView, PathHop,
   RemovalImpact, SourceInfo, SourceReport, Summary, TimelineEvent, User, SheetIdentity, Note,
+  Severity, Watch, WatchHit, WatchKind, HitStatus,
 } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const TOKEN_KEY = "sutra.token";
+const TOKEN_KEY = "cortex.token";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   try { return window.localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 export function setToken(t: string | null) {
-  try { t ? window.localStorage.setItem(TOKEN_KEY, t) : window.localStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ }
+  try {
+    if (t) window.localStorage.setItem(TOKEN_KEY, t);
+    else window.localStorage.removeItem(TOKEN_KEY);
+  } catch { /* private mode */ }
 }
 
 export class ApiError extends Error {
@@ -30,6 +34,10 @@ async function request<T>(path: string, init: RequestInit = {}, raw = false): Pr
   if (res.status === 401) {
     setToken(null);
     if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      // A hard navigation on purpose, not a router push: the session is gone, so every query cache
+      // and store still holding the previous user's records has to go with it. Only a full document
+      // load clears them, and that guarantee is worth the repaint.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
     }
     throw new ApiError(401, "Session expired");
@@ -142,6 +150,18 @@ export const api = {
   benchmarkEval: (dataset: string) => request<Record<string, unknown>>(`/api/sources/benchmarks/evaluate/${dataset}`),
   screen: (threshold = 88) => request<{ status: string; screened?: number; hits: { entity: string; matched: string; score: number; topics: string[]; lists: string[] }[] }>(`/api/sources/opensanctions/screen${qs({ threshold })}`, { method: "POST" }),
 
+  // ---- standing watches
+  watches: (active?: boolean) => request<Watch[]>(`/api/watches${qs({ active })}`),
+  watchKinds: () => request<{ kinds: { kind: WatchKind; help: string }[]; severities: Severity[]; statuses: HitStatus[] }>("/api/watches/kinds"),
+  createWatch: (kind: WatchKind, value: string, reason = "", severity: Severity = "high") =>
+    request<Watch & { created: boolean; backfill_hits: number; note: string | null }>("/api/watches", { method: "POST", body: JSON.stringify({ kind, value, reason, severity }) }),
+  patchWatch: (id: string, body: { active?: boolean; severity?: Severity; reason?: string }) =>
+    request<Watch>(`/api/watches/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteWatch: (id: string) => request<{ deleted: boolean }>(`/api/watches/${id}`, { method: "DELETE" }),
+  rescanWatch: (id: string) => request<Watch & { new_hits: number }>(`/api/watches/${id}/rescan`, { method: "POST" }),
+  watchHits: (p: { status?: string; watch_id?: string; limit?: number } = {}) => request<WatchHit[]>(`/api/watches/hits${qs(p)}`),
+  patchWatchHit: (id: number, status: HitStatus) => request<WatchHit>(`/api/watches/hits/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
   // ---- reports
   reportMarkdown: async () => (await request<Response>("/api/reports/brief.md", {}, true)).text(),
   reportPdfUrl: () => `${API_BASE}/api/reports/brief.pdf`,
@@ -149,7 +169,7 @@ export const api = {
     const res = await request<Response>("/api/reports/brief.pdf", {}, true);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "sutra-brief.pdf"; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = "cortex-brief.pdf"; a.click();
     URL.revokeObjectURL(url);
   },
 

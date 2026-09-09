@@ -1,14 +1,21 @@
 "use client";
 /**
- * The drafted link chart. Canvas 2D on purpose: the notation needs true dashed and dotted
- * strokes and six node shapes, which Sigma's WebGL edge programs do not provide. graphology
- * holds the graph and ForceAtlas2 lays it out; this file draws it in technical-pen ink.
+ * The junction map.
+ *
+ * Canvas 2D on purpose: the notation needs true dashed and dotted strokes and nine node shapes,
+ * which Sigma's WebGL edge programs do not provide. graphology holds the graph and ForceAtlas2
+ * places the stations; this file draws them the way a transit diagram is drawn.
+ *
+ * The one rule that makes it a map and not a scatter plot: no line is drawn at an arbitrary angle.
+ * Every link leaves its station on an axis, turns once through a rounded 45° bend, and arrives.
+ * The straight run is spent at the busier end, so trunk lines fan cleanly out of the interchanges
+ * and the eye can follow a single route across a crowded field.
  */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 import type { EdgeView, NodeView } from "@/lib/types";
-import { DASH, INK, SHAPE, edgeInk, lineStyleFor, nodeRadius, relLabel, type Shape } from "@/lib/notation";
+import { DASH, INK, MONEY_RELS, SHAPE, edgeInk, lineStyleFor, nodeRadius, relLabel, routeInk, type Shape } from "@/lib/notation";
 import { useSheet } from "@/lib/store";
 
 export interface ChartProps {
@@ -27,6 +34,9 @@ export interface ChartProps {
 type Pos = { x: number; y: number };
 type Cam = { x: number; y: number; k: number };
 const INFRA = new Set(["PHONE", "BANK_ACCOUNT", "SOCIAL_HANDLE", "VEHICLE", "GOV_ID", "LOCATION"]);
+/* Canvas cannot read a CSS custom property, so the station-name face is named outright here.
+   It has to stay in step with --font-condensed in globals.css. */
+const LABEL_FACE = '"Archivo Narrow", "Archivo", system-ui, sans-serif';
 
 function drawShape(ctx: CanvasRenderingContext2D, s: Shape, x: number, y: number, r: number) {
   ctx.beginPath();
@@ -75,6 +85,35 @@ function packComponents(g: Graph, pos: Map<string, Pos>, aspect = 1.6) {
   }
 }
 
+/**
+ * The corner of an octilinear run from a to b: one axis segment and one 45° diagonal.
+ * `straightFromA` spends the axis run at a's end, which is how a trunk leaves an interchange.
+ * Returns null for a run too short to bend, which is drawn as a plain segment.
+ */
+function corner(ax: number, ay: number, bx: number, by: number, straightFromA: boolean): Pos | null {
+  const dx = bx - ax, dy = by - ay;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  if (adx < 2 && ady < 2) return null;
+  const sgx = Math.sign(dx), sgy = Math.sign(dy);
+  if (straightFromA) {
+    const run = Math.abs(adx - ady);
+    return adx > ady ? { x: ax + sgx * run, y: ay } : { x: ax, y: ay + sgy * run };
+  }
+  const d = Math.min(adx, ady);
+  return { x: ax + sgx * d, y: ay + sgy * d };
+}
+
+/** Lay the octilinear path for one link into the current context path. */
+function routePath(ctx: CanvasRenderingContext2D, ax: number, ay: number, bx: number, by: number, straightFromA: boolean, bend: number) {
+  const c = corner(ax, ay, bx, by, straightFromA);
+  ctx.moveTo(ax, ay);
+  if (!c) { ctx.lineTo(bx, by); return; }
+  // the bend can never eat more than half of the shorter of the two segments it joins
+  const r = Math.max(1, Math.min(bend, Math.hypot(c.x - ax, c.y - ay) / 2, Math.hypot(bx - c.x, by - c.y) / 2));
+  ctx.arcTo(c.x, c.y, bx, by, r);
+  ctx.lineTo(bx, by);
+}
+
 /** Deterministic pseudo-random so a re-render lays the same graph out the same way. */
 function seeded(id: string) { let h = 2166136261; for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; }
 
@@ -107,14 +146,30 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
     return m;
   }, [edges]);
   const maxW = useMemo(() => Math.max(1, ...edges.map((e) => e.weight)), [edges]);
+  /**
+   * Interchanges: stations where more than one route calls. On a transit map these are the only
+   * marks that get the double ring, and they are exactly the actors an investigator wants first —
+   * the person standing on two communities at once.
+   */
+  const interchange = useMemo(() => {
+    const routes = new Map<string, Set<number>>();
+    for (const e of edges) {
+      const ca = nodeById.get(e.source)?.community, cb = nodeById.get(e.target)?.community;
+      if (typeof cb === "number") (routes.get(e.source) ?? routes.set(e.source, new Set()).get(e.source)!).add(cb);
+      if (typeof ca === "number") (routes.get(e.target) ?? routes.set(e.target, new Set()).get(e.target)!).add(ca);
+    }
+    return new Set([...routes].filter(([, s]) => s.size > 1).map(([id]) => id));
+  }, [edges, nodeById]);
 
   const fitToView = useCallback(() => {
     const c = canvasRef.current; if (!c || !posRef.current.size) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     posRef.current.forEach((p) => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
     const w = c.clientWidth, h = c.clientHeight;
-    const pad = 90;
-    const k = Math.min((w - pad * 2) / Math.max(1, maxX - minX), (h - pad * 2) / Math.max(1, maxY - minY), 2.4);
+    // The plate is the whole panel. A generous inner margin only leaves the network looking like
+    // dust in the middle of an empty field, so the fit takes the room it is given.
+    const pad = 34;
+    const k = Math.min((w - pad * 2) / Math.max(1, maxX - minX), (h - pad * 2) / Math.max(1, maxY - minY), 3.4);
     camRef.current = { k, x: w / 2 - ((minX + maxX) / 2) * k, y: h / 2 - ((minY + maxY) / 2) * k };
   }, []);
 
@@ -164,7 +219,10 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
     const sx = (x: number) => x * cam.k + cam.x, sy = (y: number) => y * cam.k + cam.y;
     const kk = Math.max(0.55, Math.min(1.5, cam.k));
 
-    // edges: opacity carries weight; only the focus's lines go full ink
+    // Lines. Octilinear, round-jointed, inked by the route they belong to; a transit line reads as
+    // a line, so the base weight stays generous and volume rides on top of it rather than under it.
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const bend = Math.max(4, 9 * kk);
     for (const e of edges) {
       const a = pos.get(e.source), b = pos.get(e.target); if (!a || !b) continue;
       const rec = receded(e.source) || receded(e.target);
@@ -172,18 +230,27 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
       const touchesFocus = focusId !== null && (e.source === focusId || e.target === focusId);
       const style = lineStyleFor(e.attrs?.extractor as string | undefined, e.confidence);
       const rel = Math.min(1, e.weight / maxW);
-      ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y));
+      // the axis run is spent at the busier end, so trunks leave the interchanges square
+      const da = neighbours.get(e.source)?.size ?? 0, db = neighbours.get(e.target)?.size ?? 0;
+      const [p, q] = da >= db ? [a, b] : [b, a];
+      ctx.beginPath();
+      routePath(ctx, sx(p.x), sy(p.y), sx(q.x), sy(q.y), true, bend);
       ctx.setLineDash(DASH[style].map((d) => d * kk));
-      if (onRoute) { ctx.strokeStyle = INK.pencil; ctx.lineWidth = 2.6; ctx.globalAlpha = 1; }
+      if (onRoute) { ctx.strokeStyle = INK.pencil; ctx.lineWidth = 3.4 * kk; ctx.globalAlpha = 1; }
       else {
-        ctx.strokeStyle = edgeInk(e.rel_type);
+        // A route map inks each line by the service it belongs to. Two actors in one community
+        // ride that community's colour; a line crossing between them stays neutral, which is
+        // exactly what makes an interchange visible without labelling it.
+        const ca = nodeById.get(e.source)?.community, cb = nodeById.get(e.target)?.community;
+        const money = MONEY_RELS.has(e.rel_type);
+        ctx.strokeStyle = money ? INK.blue : (ca !== null && ca !== undefined && ca === cb) ? routeInk(ca) : INK.inkSoft;
         const sq = Math.sqrt(rel);
-        ctx.lineWidth = (0.7 + sq * 1.8) * kk;
-        ctx.globalAlpha = rec ? 0.05 : touchesFocus || hover?.edge === e.id ? 0.95 : edges.length > 400 ? 0.18 + sq * 0.4 : 0.35 + sq * 0.45;
+        ctx.lineWidth = (1.5 + sq * 2.2) * kk;
+        ctx.globalAlpha = rec ? 0.08 : touchesFocus || hover?.edge === e.id ? 1 : edges.length > 400 ? 0.55 + sq * 0.35 : 0.78 + sq * 0.22;
       }
       ctx.stroke();
     }
-    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
 
     // nodes
     ctx.textBaseline = "middle"; ctx.textAlign = "left";
@@ -191,7 +258,7 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
     const drawn: { x: number; y: number; w: number; h: number }[] = [];
     const sorted = nodes.slice().sort((p, q) => q.priority - p.priority);
     // the names a reader needs at rest: the highest-priority and best-connected actors
-    const named = new Set(sorted.filter((n) => !INFRA.has(n.type)).sort((p, q) => (q.priority + q.degree / 40) - (p.priority + p.degree / 40)).slice(0, labelAll ? 400 : 28).map((n) => n.id));
+    const named = new Set(sorted.filter((n) => !INFRA.has(n.type)).sort((p, q) => (q.priority + q.degree / 40) - (p.priority + p.degree / 40)).slice(0, labelAll ? 44 : 24).map((n) => n.id));
     for (const n of sorted) {
       const p = pos.get(n.id); if (!p) continue;
       const x = sx(p.x), y = sy(p.y);
@@ -201,10 +268,17 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
       const isSel = n.id === selected, isHov = n.id === hover?.node, onRoute = !!route?.includes(n.id);
       const poi = n.suspicion >= 0.2;
       ctx.globalAlpha = rec ? 0.15 : 1;
+      const stationInk = isSel || onRoute ? INK.pencil : n.type === "BANK_ACCOUNT" ? INK.blue : infra ? INK.inkSoft : routeInk(n.community);
+      // The interchange marker: a second ring, and only ever here. It says this actor stands on
+      // more than one route — which is the whole reason a broker is worth opening.
+      if (interchange.has(n.id) && !infra) {
+        ctx.beginPath(); ctx.arc(x, y, r + 3.2 * Math.min(1.3, kk), 0, Math.PI * 2);
+        ctx.strokeStyle = stationInk; ctx.lineWidth = 1 * Math.min(1.3, kk); ctx.stroke();
+      }
       drawShape(ctx, SHAPE[n.type], x, y, r);
-      ctx.fillStyle = INK.film; ctx.fill();
-      ctx.lineWidth = (isSel || onRoute ? 2.4 : poi ? 1.7 : 1) * Math.min(1.3, kk);
-      ctx.strokeStyle = isSel || onRoute ? INK.pencil : n.type === "BANK_ACCOUNT" ? INK.blue : infra ? INK.inkSoft : INK.ink;
+      ctx.fillStyle = "#EEF0ED"; ctx.fill();
+      ctx.lineWidth = (isSel || onRoute ? 3 : poi || interchange.has(n.id) ? 2.3 : 1.6) * Math.min(1.3, kk);
+      ctx.strokeStyle = stationInk;
       ctx.stroke();
       if (poi && (n.type === "PERSON" || n.type === "ORGANIZATION")) { ctx.beginPath(); ctx.arc(x, y, Math.max(1.4, r * 0.34), 0, Math.PI * 2); ctx.fillStyle = INK.pencil; ctx.fill(); }
       if (isSel || isHov) { ctx.beginPath(); ctx.arc(x, y, r + 5, 0, Math.PI * 2); ctx.strokeStyle = INK.pencil; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); }
@@ -212,24 +286,45 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
       // labels: persons of interest and organisations always; everything else on hover/selection or when asked
       // at rest: persons of interest, and organisations that anchor something (degree ≥ 3); the rest on hover or zoom
       const anchor = n.type === "ORGANIZATION" && (n.degree >= 3 || cam.k > 0.9);
-      const wantLabel = isSel || isHov || (!rec && (named.has(n.id) || (labelAll ? !infra : ((poi && !infra) || anchor) && cam.k > 0.3)));
+      const wantLabel = isSel || isHov || (!rec && (named.has(n.id) || (((poi && !infra) || anchor) && cam.k > 0.75)));
       if (wantLabel) {
         const fs = (isSel ? 12.5 : poi ? 11.5 : 10.5) * labelScale;
-        ctx.font = `${isSel || poi ? 600 : 500} ${fs}px var(--font-barlow-condensed), sans-serif`;
+        ctx.font = `${isSel || poi ? 600 : 500} ${fs}px ${LABEL_FACE}`;
         const label = n.label.length > 26 ? n.label.slice(0, 24) + "…" : n.label;
         const tw = ctx.measureText(label).width, th = fs * 1.2;
-        const tx = x + r + 4, ty = y;
-        const box = { x: tx - 2, y: ty - th / 2, w: tw + 4, h: th };
-        const collides = !isSel && !isHov && drawn.some((d) => box.x < d.x + d.w && box.x + box.w > d.x && box.y < d.y + d.h && box.y + box.h > d.y);
-        if (!collides) {
-          drawn.push(box);
-          ctx.fillStyle = "rgba(237,237,234,0.88)"; ctx.fillRect(box.x, box.y, box.w, box.h);
+        const gap = r + 4;
+        /**
+         * Station names are set around the mark, the way they are on a printed map: right first,
+         * then left, then below, then above. A name that would collide with one already set, or
+         * would run off the plate, gives up its slot rather than being printed on top of another
+         * name or sliced by the frame.
+         */
+        const slots: [number, number][] = [
+          [x + gap, y], [x - gap - tw, y],
+          [x - tw / 2, y + gap + th * 0.4], [x - tw / 2, y - gap - th * 0.4],
+        ];
+        let placed: { x: number; y: number; w: number; h: number } | null = null;
+        let tx = 0, ty = 0;
+        for (const [cx2, cy2] of slots) {
+          const box = { x: cx2 - 2, y: cy2 - th / 2, w: tw + 4, h: th };
+          if (box.x < 2 || box.y < 2 || box.x + box.w > w - 2 || box.y + box.h > h - 2) continue;
+          if (drawn.some((d) => box.x < d.x + d.w && box.x + box.w > d.x && box.y < d.y + d.h && box.y + box.h > d.y)) continue;
+          placed = box; tx = cx2; ty = cy2; break;
+        }
+        // the selection always gets its name, even where it has to sit on top of another
+        if (!placed && (isSel || isHov)) {
+          const cx2 = Math.max(2, Math.min(w - tw - 4, x + gap));
+          placed = { x: cx2 - 2, y: y - th / 2, w: tw + 4, h: th }; tx = cx2; ty = y;
+        }
+        if (placed) {
+          drawn.push(placed);
+          ctx.fillStyle = "rgba(228,231,228,0.9)"; ctx.fillRect(placed.x, placed.y, placed.w, placed.h);
           ctx.fillStyle = rec ? INK.inkFaint : isSel ? INK.pencil : INK.ink; ctx.fillText(label, tx, ty);
         }
       }
     }
     ctx.globalAlpha = 1;
-  }, [nodes, edges, selected, presentation, emphasisSet, routeSet, neighbours, route, maxW, labelAll]);
+  }, [nodes, edges, selected, presentation, emphasisSet, routeSet, neighbours, interchange, nodeById, route, maxW, labelAll]);
 
   useEffect(() => { const loop = () => { draw(); rafRef.current = requestAnimationFrame(loop); }; rafRef.current = requestAnimationFrame(loop); return () => cancelAnimationFrame(rafRef.current); }, [draw]);
   useEffect(() => { const ro = new ResizeObserver(() => fitToView()); if (wrapRef.current) ro.observe(wrapRef.current); return () => ro.disconnect(); }, [fitToView]);

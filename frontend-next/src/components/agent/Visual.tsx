@@ -47,7 +47,7 @@ function AgentTable({ visual, onPick }: { visual: TableVisual; onPick?: (id: str
   );
   return (
     <div className="-mx-1 overflow-x-auto">
-      <table className="w-full border-collapse text-[var(--fs-body)]">
+      <table className="w-full border-collapse text-[length:var(--fs-body)]">
         <thead>
           <tr>{columns.map((c, i) => (
             <th key={i} className={cn("label border-b border-ink px-2 py-1 whitespace-nowrap", numeric[i] ? "text-right" : "text-left")}>{c}</th>
@@ -114,7 +114,7 @@ function AgentTimeline({ visual, onPick }: { visual: TimelineVisual; onPick?: (i
             <span className="absolute -left-[21px] top-[13px] h-1.5 w-1.5 rotate-45"
                   style={{ background: e.emphasis ? INK.pencil : KIND_INK[e.kind] ?? INK.inkSoft }} aria-hidden="true" />
             <div className="flex flex-wrap items-baseline gap-x-2">
-              <time className="figure shrink-0 text-[var(--fs-note)] text-ink-faint tabular-nums">{fmt(e.at)}</time>
+              <time className="figure shrink-0 text-[length:var(--fs-note)] text-ink-faint tabular-nums">{fmt(e.at)}</time>
               {e.kind && <span className="label text-[10px] leading-none text-ink-faint">{e.kind}</span>}
             </div>
             <p className={cn("leading-snug", e.emphasis && "font-semibold text-pencil")}>{e.label}</p>

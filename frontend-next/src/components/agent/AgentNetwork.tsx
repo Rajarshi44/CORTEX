@@ -284,7 +284,7 @@ export default function AgentNetwork({ visual, onPick }: { visual: NetworkVisual
         </svg>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-2">
-          <p className="note-paper max-w-[70%] px-2 py-1 text-[var(--fs-note)] leading-snug">
+          <p className="note-paper max-w-[70%] px-2 py-1 text-[length:var(--fs-note)] leading-snug">
             {hover?.node ? (
               <>
                 <strong className="font-semibold">{hover.node.label}</strong>{" "}
