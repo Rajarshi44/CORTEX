@@ -15,7 +15,7 @@ import html as _html
 import logging
 import os
 import re
-from urllib.parse import quote_plus, urlparse, parse_qs, unquote
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import httpx
 
@@ -152,7 +152,7 @@ class WebConnector(Connector):
         seen: set[str] = set()
         blocks = re.findall(
             r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>(.*?)(?=<a[^>]+class="result__a"|</div>\s*</div>\s*</div>)',
-            page, re.S)
+            page, re.DOTALL)
         for href, title, tail in blocks:
             url = unquote(parse_qs(urlparse(_html.unescape(href)).query).get("uddg", [_html.unescape(href)])[0])
             if not url.startswith("http"):
@@ -184,7 +184,7 @@ class WebConnector(Connector):
             return {"tier": "unavailable", "url": url, "title": "", "text": "",
                     "reason": res.reason or f"HTTP {res.http_status}"}
         raw = res.text
-        title = re.search(r"<title[^>]*>(.*?)</title>", raw, re.S | re.I)
+        title = re.search(r"<title[^>]*>(.*?)</title>", raw, re.DOTALL | re.IGNORECASE)
         text = self.strip_html(raw)
         return {"tier": "cached" if res.from_cache else "http", "url": url,
                 "title": _html.unescape(title.group(1)).strip() if title else url,

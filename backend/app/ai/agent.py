@@ -30,7 +30,8 @@ import networkx as nx
 from sqlalchemy.orm import Session
 
 from . import tools as T
-from .providers import available_providers, status as provider_status, stream_with_fallback
+from .providers import status as provider_status
+from .providers import stream_with_fallback
 
 log = logging.getLogger("cna.agent")
 

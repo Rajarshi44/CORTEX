@@ -17,12 +17,12 @@ Three rules keep the answers honest:
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
-from collections import Counter, defaultdict
+from collections import Counter
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 import networkx as nx
 from sqlalchemy import func
