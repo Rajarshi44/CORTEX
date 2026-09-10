@@ -11,7 +11,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DASH, INK, SHAPE, edgeInk, lineStyleFor, relLabel, type Shape } from "@/lib/notation";
 import type { NetworkVisual, NetworkNode, NetworkEdge } from "@/lib/agent";
-import { cn } from "@/lib/utils";
 
 
 function glyphPath(s: Shape, x: number, y: number, r: number): string {
@@ -262,7 +261,7 @@ export default function AgentNetwork({ visual, onPick }: { visual: NetworkVisual
             const r = (n.type === "PERSON" || n.type === "ORGANIZATION" ? 6 + Math.min(n.priority, 1) * 7 : 4.6);
             const dim = hover?.node && hover.node.id !== n.id &&
               !edges.some((e) => (e.source === n.id && e.target === hover.node!.id) || (e.target === n.id && e.source === hover.node!.id));
-            const ink = isHot ? INK.pencil : n.type === "BANK_ACCOUNT" ? INK.blue : INK.ink;
+            const ink = isHot ? INK.pencil : n.type === "BANK_ACCOUNT" || n.type === "CRYPTO_WALLET" ? INK.blue : INK.ink;
             return (
               <g key={n.id} className="cursor-pointer" opacity={dim ? 0.3 : 1}
                  onMouseEnter={() => setHover({ node: n })} onMouseLeave={() => setHover(null)}

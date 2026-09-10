@@ -17,6 +17,8 @@ export function Glyph({ shape, size = 14, stroke = INK.ink, fill = "none", class
     pin: `M${c},${c + r * 1.1} C${c - r * 1.2},${c - r * 0.2} ${c - r * 0.9},${c - r * 1.1} ${c},${c - r * 1.1} C${c + r * 0.9},${c - r * 1.1} ${c + r * 1.2},${c - r * 0.2} ${c},${c + r * 1.1}z`,
     tag: `M${c - r * 1.2},${c - r * 0.8}H${c + r * 0.7}L${c + r * 1.3},${c}L${c + r * 0.7},${c + r * 0.8}H${c - r * 1.2}z`,
     ring: `M${c + r},${c} a${r},${r} 0 1,0 ${-2 * r},0 a${r},${r} 0 1,0 ${2 * r},0 M${c + r * 0.45},${c} a${r * 0.45},${r * 0.45} 0 1,0 ${-0.9 * r},0 a${r * 0.45},${r * 0.45} 0 1,0 ${0.9 * r},0`,
+    "cut-hexagon": Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 3 * i - Math.PI / 6; return `${i ? "L" : "M"}${c + r * 1.1 * Math.cos(a)},${c + r * 1.1 * Math.sin(a)}`; }).join("")
+      + `z M${c - r * 1.15},${c - r * 0.35}L${c - r * 0.35},${c - r * 1.15}`,
   };
   return <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={className} aria-hidden="true"><path d={d[shape]} fill={fill} stroke={stroke} strokeWidth={1.3} strokeLinejoin="round" fillRule="evenodd" /></svg>;
 }
@@ -46,7 +48,7 @@ export default function KeyRail({ counts }: { counts?: Record<string, number> })
                 onClick={() => toggle(t)}
                 className={cn("group flex h-9 w-11 flex-col items-center justify-center rounded-[2px] transition-colors hover:bg-film-lift focus-visible:ring-2 focus-visible:ring-pencil", off && "opacity-35")}
               >
-                <Glyph shape={SHAPE[t]} size={presentation ? 18 : 15} stroke={t === "BANK_ACCOUNT" ? INK.blue : INK.ink} className={cn(off && "[&>path]:stroke-ink-faint")} />
+                <Glyph shape={SHAPE[t]} size={presentation ? 18 : 15} stroke={t === "BANK_ACCOUNT" || t === "CRYPTO_WALLET" ? INK.blue : INK.ink} className={cn(off && "[&>path]:stroke-ink-faint")} />
                 {n !== undefined && <span className="figure mt-0.5 text-[9px] leading-none text-ink-faint">{n}</span>}
               </button>
             </li>

@@ -85,7 +85,9 @@ class Settings(BaseSettings):
     # "none" keeps the budget for the tool call itself; raise to "low"/"medium" for harder text.
     llm_reasoning_effort: str = "none"
     llm_max_tokens: int = 8000
-    llm_narrate_tokens: int = 1200
+    # Reasoning tokens come out of this same budget, so a ceiling tuned for the answer alone left
+    # the model a couple of hundred tokens to write in and every answer stopped mid-word.
+    llm_narrate_tokens: int = 4000
     llm_max_input_chars: int = 12000
     llm_timeout: float = 240.0
     llm_max_retries: int = 3

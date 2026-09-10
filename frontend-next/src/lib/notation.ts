@@ -37,13 +37,14 @@ export function routeInk(community: number | null | undefined): string {
   return ROUTE_INKS[Math.abs(community) % ROUTE_INKS.length];
 }
 
-export type Shape = "circle" | "square" | "diamond" | "hexagon" | "triangle" | "rect" | "pin" | "tag" | "ring";
+export type Shape = "circle" | "square" | "diamond" | "hexagon" | "triangle" | "rect" | "pin" | "tag" | "ring" | "cut-hexagon";
 
 export const SHAPE: Record<EntityType, Shape> = {
   PERSON: "circle",
   ORGANIZATION: "square",
   PHONE: "diamond",
   BANK_ACCOUNT: "hexagon",
+  CRYPTO_WALLET: "cut-hexagon",
   VEHICLE: "triangle",
   CASE: "rect",
   REPORT: "rect",
@@ -54,10 +55,11 @@ export const SHAPE: Record<EntityType, Shape> = {
 
 export const TYPE_LABEL: Record<EntityType, string> = {
   PERSON: "Person", ORGANIZATION: "Organisation", PHONE: "Phone", BANK_ACCOUNT: "Account", VEHICLE: "Vehicle",
-  CASE: "Case / FIR", REPORT: "Report", LOCATION: "Location", SOCIAL_HANDLE: "Handle", GOV_ID: "Identifier",
+  CRYPTO_WALLET: "Crypto wallet", CASE: "Case / FIR", REPORT: "Report", LOCATION: "Location",
+  SOCIAL_HANDLE: "Handle", GOV_ID: "Identifier",
 };
 
-export const TYPE_ORDER: EntityType[] = ["PERSON", "ORGANIZATION", "PHONE", "BANK_ACCOUNT", "VEHICLE", "GOV_ID", "CASE", "REPORT", "LOCATION", "SOCIAL_HANDLE"];
+export const TYPE_ORDER: EntityType[] = ["PERSON", "ORGANIZATION", "PHONE", "BANK_ACCOUNT", "CRYPTO_WALLET", "VEHICLE", "GOV_ID", "CASE", "REPORT", "LOCATION", "SOCIAL_HANDLE"];
 
 /** Line style = evidence grade. Solid: structured / checksum. Dashed: rule-extracted. Dotted: model-inferred. */
 export type LineStyle = "solid" | "dashed" | "dotted";
@@ -73,7 +75,7 @@ export function lineStyleFor(extractor?: Extractor | string | null, confidence?:
 export const DASH: Record<LineStyle, number[]> = { solid: [], dashed: [11, 3.5], dotted: [1.5, 4] };
 
 /** Ink per relationship family. Money is blue; everything else is pen black, weight carries volume. */
-export const MONEY_RELS = new Set(["TRANSFERRED_TO", "OWNS_ACCOUNT"]);
+export const MONEY_RELS = new Set(["TRANSFERRED_TO", "OWNS_ACCOUNT", "OWNS_WALLET", "CONVERTED_VIA"]);
 export const COMMS_RELS = new Set(["CALLED", "USES_PHONE", "SHARED_HANDSET", "PINGED_AT", "COMMUNICATED_WITH"]);
 export function edgeInk(rel: string): string {
   return MONEY_RELS.has(rel) ? INK.blue : INK.ink;
@@ -103,7 +105,8 @@ export const REL_GROUPS: { key: string; label: string; rels: string[] }[] = [
 export const SEVERITY_INK: Record<string, string> = { critical: INK.pencil, high: INK.amber, medium: INK.inkSoft, low: INK.inkFaint };
 
 export const ALERT_KIND_LABEL: Record<string, string> = {
-  burner_phone: "Burner phone", structuring: "Structured deposits", layering: "Layering chain", call_burst: "Call burst",
+  burner_phone: "Burner phone", structuring: "Structured deposits", layering: "Layering route", call_burst: "Call burst",
+  transfer_burst: "Pass-through account", complaint_hub: "Complaint hub",
   night_activity: "Night activity", international_contact: "International contact", behavioural_outlier: "Behavioural outlier",
   detector_error: "Detector error", wanted_corporate_ties: "Wanted person controls companies", offshore_officer_accused: "Offshore officer accused",
   debarred_shared_directors: "Debarred company, shared directors", mass_directorship: "Mass directorship",
@@ -117,8 +120,8 @@ export function nodeRadius(type: EntityType, priority: number, degree: number, p
 
 /** Short reference code for margin notes and the title block, e.g. "P-014". */
 export function refCode(type: EntityType, index: number): string {
-  const p: Record<EntityType, string> = { PERSON: "P", ORGANIZATION: "O", PHONE: "T", BANK_ACCOUNT: "A", VEHICLE: "V", CASE: "C", REPORT: "R", LOCATION: "L", SOCIAL_HANDLE: "H", GOV_ID: "I" };
-  return `${p[type]}-${String(index).padStart(3, "0")}`;
+  const p: Record<EntityType, string> = { PERSON: "P", ORGANIZATION: "O", PHONE: "T", BANK_ACCOUNT: "A", CRYPTO_WALLET: "W", VEHICLE: "V", CASE: "C", REPORT: "R", LOCATION: "L", SOCIAL_HANDLE: "H", GOV_ID: "I" };
+  return `${p[type] ?? "X"}-${String(index).padStart(3, "0")}`;
 }
 
 export const fmtInr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;

@@ -10,10 +10,6 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Link2 } from "lucide-react";
 
-function Bar({ v, ink = "var(--ink)", max = 1 }: { v: number; ink?: string; max?: number }) {
-  return <span className="inline-block h-1.5 w-20 bg-film-deep align-middle"><span className="block h-full" style={{ width: `${Math.min(100, (v / max) * 100)}%`, background: ink }} /></span>;
-}
-
 function Players() {
   const { data: kp } = useKeyPlayers();
   const { data: comms } = useCommunities();

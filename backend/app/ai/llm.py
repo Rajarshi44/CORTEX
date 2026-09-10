@@ -187,6 +187,11 @@ def _body(messages: list[dict], *, max_tokens: int, tool: dict | None = None) ->
         body["tool_choice"] = {"type": "function", "function": {"name": tool["name"]}}
     if settings.llm_reasoning_effort and settings.llm_reasoning_effort != "none":
         body["reasoning"] = {"effort": settings.llm_reasoning_effort}
+    else:
+        # The default model reasons before answering. With no `reasoning` key at all, some providers
+        # return that reasoning inside `content` - so the console showed "The user is asking..., I
+        # need to..." as the answer, then ran out of budget mid-sentence. Ask for it to be excluded.
+        body["reasoning"] = {"exclude": True}
     return body
 
 
@@ -315,6 +320,37 @@ def extract_entities_llm(text: str) -> ExtractionResult | None:
 
 
 # --------------------------------------------------------------------------------- narration
+# Openers a reasoning model uses when it is thinking out loud rather than answering. Narration that
+# starts this way is a monologue, not an answer, and the deterministic text it was asked to improve
+# on is strictly better than a truncated transcript of the model talking to itself.
+_MONOLOGUE_RE = re.compile(
+    r"^\s*(?:the user (?:is |wants|asks|asked)|i (?:need|should|will|'ll|am asked|have)\b|"
+    r"let me\b|okay[,.]|first[,.] i\b|we are given|looking at the (?:json|facts)|"
+    r"based on the (?:json|provided json)\b)", re.I)
+# The model's own reasoning tags, where a provider passes them through verbatim.
+_THINK_RE = re.compile(r"<(?:think|thinking|reasoning)>.*?</(?:think|thinking|reasoning)>\s*", re.S | re.I)
+
+
+def _usable_narration(text: str, finish_reason: str | None) -> str | None:
+    """The narration if it is an answer, otherwise None so the caller keeps its own text.
+
+    A reasoning model fails two ways here, and both are worse than the deterministic sentence the
+    narration was asked to improve on: it thinks out loud into `content`, or it spends the budget
+    thinking and the answer stops mid-word. The provider reports the second itself, so that is what
+    is trusted rather than a guess from the text's length.
+    """
+    text = _THINK_RE.sub("", text).strip()
+    if not text:
+        return None
+    if _MONOLOGUE_RE.search(text):
+        log.info("narration rejected: reads as chain-of-thought, keeping the deterministic answer")
+        return None
+    if finish_reason == "length":
+        log.info("narration rejected: hit the token ceiling mid-answer, keeping the deterministic answer")
+        return None
+    return text
+
+
 def narrate(question: str, facts: dict, fallback: str) -> tuple[str, bool]:
     """Turn retrieved graph facts into an analyst-style answer. Returns (text, used_llm)."""
     if not available():
@@ -330,13 +366,15 @@ def narrate(question: str, facts: dict, fallback: str) -> tuple[str, bool]:
     if resp is None:
         return fallback, False
     try:
-        text = (resp["choices"][0]["message"].get("content") or "").strip()
+        choice = resp["choices"][0]
+        text = (choice["message"].get("content") or "").strip()
     except (KeyError, IndexError):
         return fallback, False
-    if not text:
+    good = _usable_narration(text, choice.get("finish_reason") or choice.get("native_finish_reason"))
+    if good is None:
         return fallback, False
-    _cache_put("narrate", key, text)
-    return text, True
+    _cache_put("narrate", key, good)
+    return good, True
 
 
 def strip_markdown(s: str) -> str:

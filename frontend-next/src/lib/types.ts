@@ -1,7 +1,7 @@
 // Types mirror the FastAPI responses in backend/app/api/*. Keep names identical to the JSON.
 
 export type EntityType =
-  | "PERSON" | "PHONE" | "LOCATION" | "VEHICLE" | "ORGANIZATION" | "BANK_ACCOUNT"
+  | "PERSON" | "PHONE" | "LOCATION" | "VEHICLE" | "ORGANIZATION" | "BANK_ACCOUNT" | "CRYPTO_WALLET"
   | "CASE" | "REPORT" | "SOCIAL_HANDLE" | "GOV_ID";
 
 export type Extractor = "structured" | "checksum" | "rules" | "gliner" | "llm";
@@ -10,6 +10,16 @@ export type Severity = "critical" | "high" | "medium" | "low";
 export type AlertStatus = "open" | "reviewing" | "dismissed" | "confirmed";
 
 export interface User { username: string; role: "admin" | "analyst" | "viewer"; full_name: string }
+
+/** One detector on the roster, and whether it has anything to say about this sheet. */
+export interface Detector {
+  name: string; kinds: string[]; needs: string; looks_for: string; alerts: number; fired: boolean;
+  /** how many records of the kind it reads this sheet actually holds */
+  records_held: number; records_unit: string;
+  /** fired: found something. silent: read real records, found nothing. starved: nothing to read. */
+  state: "fired" | "silent" | "starved";
+}
+export interface DetectorRoster { detectors: Detector[]; total: number; fired: number; silent: number; starved: number; alerts: number }
 
 export interface NodeView {
   id: string; type: EntityType; label: string; aliases: string[];

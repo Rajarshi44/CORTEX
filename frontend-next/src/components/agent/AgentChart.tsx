@@ -209,11 +209,14 @@ function Donut({ pts, unit, width, onPick }: { pts: ChartPoint[]; unit: string; 
   const rows = pts.slice(0, 7);
   const total = rows.reduce((s, p) => s + Math.abs(p.value), 0) || 1;
   const size = 168, R = 74, r = 44, cx = size / 2, cy = size / 2;
-  let angle = -Math.PI / 2;
+  // Each slice starts where every slice before it ended. Derived from a running sum rather than
+  // carried in a mutable cursor, so the map stays a pure function of `rows`.
+  const START = -Math.PI / 2;
+  const before = rows.reduce<number[]>((acc, p) => [...acc, acc[acc.length - 1] + Math.abs(p.value)], [0]);
   const arcs = rows.map((p, i) => {
     const sweep = (Math.abs(p.value) / total) * Math.PI * 2;
-    const a0 = angle, a1 = angle + sweep;
-    angle = a1;
+    const a0 = START + (before[i] / total) * Math.PI * 2;
+    const a1 = a0 + sweep;
     const large = sweep > Math.PI ? 1 : 0;
     const d = [
       `M${cx + R * Math.cos(a0)},${cy + R * Math.sin(a0)}`,

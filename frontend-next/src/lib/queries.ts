@@ -39,6 +39,7 @@ export const useKeyPlayers = () => useQuery({ queryKey: qk.keyPlayers, queryFn: 
 export const useCommunities = () => useQuery({ queryKey: qk.communities, queryFn: api.communities });
 export const useLinkPredictions = () => useQuery({ queryKey: qk.linkPred, queryFn: api.linkPredictions });
 export const useAlerts = (p: Parameters<typeof api.alerts>[0] = {}) => useQuery({ queryKey: qk.alerts(p), queryFn: () => api.alerts(p) });
+export const useDetectors = () => useQuery({ queryKey: ["detectors"], queryFn: () => api.detectors(), staleTime: 60_000 });
 export const useTimeline = (p: Parameters<typeof api.timeline>[0] = {}) => useQuery({ queryKey: qk.timeline(p), queryFn: () => api.timeline(p) });
 export const useHistogram = () => useQuery({ queryKey: qk.histogram, queryFn: () => api.histogram("day", true) });
 export const useGeo = () => useQuery({ queryKey: qk.geo, queryFn: api.geo });

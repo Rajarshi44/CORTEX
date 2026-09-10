@@ -52,8 +52,8 @@ class Ctx:
         ref = str(ref).strip()
         if ref in self.G:
             return ref
-        want = types or ("PERSON", "ORGANIZATION", "LOCATION", "PHONE", "BANK_ACCOUNT", "VEHICLE",
-                         "SOCIAL_HANDLE", "GOV_ID", "CASE", "REPORT")
+        want = types or ("PERSON", "ORGANIZATION", "LOCATION", "PHONE", "BANK_ACCOUNT", "CRYPTO_WALLET",
+                         "VEHICLE", "SOCIAL_HANDLE", "GOV_ID", "CASE", "REPORT")
         low = ref.lower()
         for n, d in self.G.nodes(data=True):
             if d["type"] in want and (d["label"].lower() == low or any(a.lower() == low for a in d.get("aliases", []))):
@@ -125,7 +125,7 @@ def run(ctx: Ctx, name: str, args: dict) -> Any:
       "spelling. Always start here when the question names someone - it returns the entity ids every other tool needs.",
       obj({"query": {**S_STR, "description": "Name, alias, phone number, registration, account or fragment of one."},
            "types": {"type": "array", "items": S_STR,
-                     "description": "Restrict to entity types: PERSON, ORGANIZATION, PHONE, BANK_ACCOUNT, VEHICLE, LOCATION, CASE, REPORT, SOCIAL_HANDLE, GOV_ID."},
+                     "description": "Restrict to entity types: PERSON, ORGANIZATION, PHONE, BANK_ACCOUNT, CRYPTO_WALLET, VEHICLE, LOCATION, CASE, REPORT, SOCIAL_HANDLE, GOV_ID."},
            "limit": {**S_INT, "description": "Max results, default 8."}}, ["query"]))
 def _search_entities(ctx: Ctx, a: dict):
     rows = Q.find_entities(ctx.db, a["query"], a.get("types"), int(a.get("limit") or 8))

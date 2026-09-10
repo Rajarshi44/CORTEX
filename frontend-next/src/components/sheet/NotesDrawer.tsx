@@ -54,7 +54,6 @@ function SourceLink({ title, href, plain, className }: { title: string; href: st
 function EvidenceNote({ e, i }: { e: Evidence; i: number }) {
   const style = lineStyleFor(e.extractor, e.confidence);
   const href = sourceHref(e.source_type, e.source_url);
-  const at = when(e.at);
   return (
     <li className="border-b border-rule py-2 last:border-b-0">
       <blockquote className="border-l border-rule-strong pl-2 text-[length:var(--fs-body)] leading-snug text-ink">“{(e.snippet ?? "").trim()}”</blockquote>
@@ -176,7 +175,7 @@ export default function NotesDrawer() {
   return (
     <aside aria-label="Margin notes" className="absolute inset-y-0 right-0 z-20 flex w-[var(--notes-w)] max-w-[92vw] flex-col border-l border-ink bg-film-lift shadow-[-8px_0_24px_-16px_rgba(31,31,31,0.5)]">
       <header className="flex items-start gap-2 border-b border-ink px-3 py-2">
-        {e ? <Glyph shape={SHAPE[e.type]} size={18} stroke={e.type === "BANK_ACCOUNT" ? INK.blue : INK.ink} className="mt-1 shrink-0" /> : <span className="h-4 w-4" />}
+        {e ? <Glyph shape={SHAPE[e.type]} size={18} stroke={e.type === "BANK_ACCOUNT" || e.type === "CRYPTO_WALLET" ? INK.blue : INK.ink} className="mt-1 shrink-0" /> : <span className="h-4 w-4" />}
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[length:var(--fs-title)] font-semibold leading-tight text-ink">{e?.label ?? (isLoading ? "Loading note…" : "—")}</h2>
           <p className="note truncate">{e ? [TYPE_LABEL[e.type], e.aliases?.length ? `@ ${e.aliases.join(", ")}` : null, e.role].filter(Boolean).join(" · ") : ""}</p>
@@ -287,7 +286,7 @@ export default function NotesDrawer() {
                     return (
                       <li key={`${r.other.id}-${i}`} className="border-b border-rule py-1.5 last:border-b-0">
                         <button type="button" onClick={() => select(r.other.id)} className="flex w-full items-center gap-2 text-left hover:text-pencil">
-                          <Glyph shape={SHAPE[r.other.type]} size={13} stroke={r.other.type === "BANK_ACCOUNT" ? INK.blue : INK.ink} />
+                          <Glyph shape={SHAPE[r.other.type]} size={13} stroke={r.other.type === "BANK_ACCOUNT" || r.other.type === "CRYPTO_WALLET" ? INK.blue : INK.ink} />
                           <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)]">{r.other.label}</span>
                           {r.count > 1 && <span className="figure note shrink-0">{r.count}×</span>}
                         </button>

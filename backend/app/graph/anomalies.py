@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import networkx as nx
 import numpy as np
@@ -39,6 +39,10 @@ from ..db import Alert, TimelineEvent
 
 log = logging.getLogger("cna.anomalies")
 
+# How long "a few days" is, for concentration windows. Five working days is one bank week: long
+# enough to hold a weekend, short enough that nothing legitimate empties into it and out again.
+WINDOW_DAYS = 5
+
 
 def _sev(score: float) -> str:
     return "critical" if score >= 0.85 else "high" if score >= 0.65 else "medium" if score >= 0.4 else "low"
@@ -56,6 +60,7 @@ class AnomalyDetector:
         self.D = D
         self.calls = [e for e in db.query(TimelineEvent).filter(TimelineEvent.kind == "CALL").all()]
         self.transfers = [e for e in db.query(TimelineEvent).filter(TimelineEvent.kind == "TRANSFER").all()]
+        self.complaints = [e for e in db.query(TimelineEvent).filter(TimelineEvent.kind == "COMPLAINT").all()]
         self.owner = self._owners()
 
     # ------------------------------------------------------------------ helpers
@@ -240,12 +245,17 @@ class AnomalyDetector:
         return out
 
     def layering_chains(self) -> list[dict]:
-        out = []
+        """Value walked through several accounts fast enough, and intact enough, to be placement.
+
+        Chains are reported by *route*, not by transfer. A syndicate runs the same path repeatedly -
+        that is what a laundering pipeline is - and one alert per transfer buried the finding under
+        seventeen copies of itself. The route is the finding; the individual runs are its evidence.
+        """
         big = [e for e in self.transfers if e.details.get("amount", 0) >= 200_000 and len(e.entity_ids) == 2]
         by_src: dict[str, list[TimelineEvent]] = defaultdict(list)
         for e in big:
             by_src[e.entity_ids[0]].append(e)
-        seen_chains = set()
+        routes: dict[tuple[str, ...], list[list[TimelineEvent]]] = defaultdict(list)
         for e0 in big:
             chain = [e0]
             cur = e0
@@ -259,22 +269,159 @@ class AnomalyDetector:
                 if len(chain) >= 5:
                     break
             if len(chain) >= 3:
-                key = tuple(c.details.get("txn_id") for c in chain)
-                if key in seen_chains or any(set(key) <= set(k) for k in seen_chains):
-                    continue
-                seen_chains.add(key)
-                hops = " → ".join([chain[0].details.get("from_holder", "?")] + [c.details.get("to_holder", "?") for c in chain])
-                retained = chain[-1].details["amount"] / chain[0].details["amount"]
-                score = min(1.0, 0.6 + 0.1 * (len(chain) - 2) + (0.1 if retained > 0.6 else 0))
-                out.append(_alert(
-                    "layering", f"Layering chain ({chain[0].occurred_at:%d %b}): {hops}",
-                    f"₹{chain[0].details['amount']:,.0f} moved through {len(chain)} hops in "
-                    f"{(chain[-1].occurred_at - chain[0].occurred_at).total_seconds() / 3600:.0f}h, retaining {retained:.0%} of value "
-                    f"(remarks: {', '.join(str(c.details.get('remarks') or '-') for c in chain)}).",
-                    score, [x for c in chain for x in c.entity_ids] + [o for c in chain for x in c.entity_ids for o in self.owner.get(x, [])],
-                    {"hops": [{"from": c.details.get("from_holder"), "to": c.details.get("to_holder"), "amount": c.details.get("amount"),
-                               "at": c.occurred_at.isoformat(), "txn_id": c.details.get("txn_id")} for c in chain],
-                     "retained_fraction": round(retained, 3)}))
+                # Key on the path the money is walked down, not on where it came in. A pipeline is
+                # fed by a different defrauded account every time; keying on the origin reported the
+                # same three launderers once per victim.
+                routes[tuple(c.entity_ids[1] for c in chain)].append(chain)
+        # A route only ever walked as a segment of a longer one is that longer one, reported twice.
+        keys = sorted(routes, key=len, reverse=True)
+        for i, k in enumerate(keys):
+            if any(len(k) < len(j) and any(j[o:o + len(k)] == k for o in range(len(j) - len(k) + 1)) for j in keys[:i]):
+                routes.pop(k, None)
+
+        out = []
+        for stops, chains in routes.items():
+            chains.sort(key=lambda c: -c[0].details["amount"])
+            lead = chains[0]
+            total = sum(c[0].details["amount"] for c in chains)
+            origins = Counter(c[0].details.get("from_holder") or "?" for c in chains)
+            source_accounts = {c[0].entity_ids[0] for c in chains}
+            head = origins.most_common(1)[0][0] if len(origins) == 1 else f"{len(origins)} source accounts"
+            # One person holding two stops in a row is the interesting part of the route, not a typo.
+            # Name the instrument at each such stop so the line does not read "X -> X".
+            stop_labels, prev = [head], head
+            for c, node in zip(lead, stops):
+                who = c.details.get("to_holder") or "?"
+                stop_labels.append(f"{who} ({self.label(node)})" if who == prev else who)
+                prev = who
+            hops = " → ".join(stop_labels)
+            retained = lead[-1].details["amount"] / lead[0].details["amount"]
+            fastest = min((c[-1].occurred_at - c[0].occurred_at).total_seconds() / 3600 for c in chains)
+            first = min(c[0].occurred_at for c in chains)
+            last = max(c[-1].occurred_at for c in chains)
+            score = min(1.0, 0.6 + 0.1 * (len(lead) - 2) + (0.1 if retained > 0.6 else 0) + (0.05 if len(chains) > 1 else 0))
+            runs = (f"The same route was walked {len(chains)} times between {first:%d %b} and {last:%d %b}, "
+                    f"moving ₹{total:,.0f}"
+                    + (f" from {len(source_accounts)} separate source accounts" if len(source_accounts) > 1 else "")
+                    + f"; the fastest run completed in {fastest:.0f}h. " if len(chains) > 1 else "")
+            out.append(_alert(
+                "layering", f"Layering route ({len(lead)} hops): {hops}",
+                f"₹{lead[0].details['amount']:,.0f} moved through {len(lead)} hops in "
+                f"{(lead[-1].occurred_at - lead[0].occurred_at).total_seconds() / 3600:.0f}h, retaining {retained:.0%} of value "
+                f"(remarks: {', '.join(str(c.details.get('remarks') or '-') for c in lead)}). {runs}"
+                f"Value that survives several hops nearly intact is being moved, not traded.",
+                score,
+                list(dict.fromkeys(list(stops) + [o for x in stops for o in self.owner.get(x, [])])),
+                {"runs": len(chains), "total_moved": total, "sources": dict(origins.most_common(8)),
+                 "source_accounts": len(source_accounts),
+                 "first": first.isoformat(), "last": last.isoformat(),
+                 "fastest_hours": round(fastest, 1), "retained_fraction": round(retained, 3),
+                 "hops": [{"from": c.details.get("from_holder"), "to": c.details.get("to_holder"), "amount": c.details.get("amount"),
+                           "at": c.occurred_at.isoformat(), "txn_id": c.details.get("txn_id")} for c in lead],
+                 "other_runs": [{"at": c[0].occurred_at.isoformat(), "amount": c[0].details.get("amount"),
+                                 "txn_id": c[0].details.get("txn_id")} for c in chains[1:8]]}))
+        return out
+
+    def transfer_bursts(self) -> list[dict]:
+        """An account whose entire working life is a few days of intake that immediately leaves.
+
+        This is what a mule account is bought for, and it is measured against the account's own
+        record rather than against other accounts: a business account moves a lot of money and is
+        not remarkable for it. What is remarkable is an account that receives nearly everything it
+        will ever receive inside one short window, from counterparties with no relation to each
+        other, and forwards it before the week is out. Concentration and pass-through are the
+        finding; the raw total is only the scale of it.
+        """
+        out = []
+        inbound: dict[str, list[TimelineEvent]] = defaultdict(list)
+        for e in self.transfers:
+            if len(e.entity_ids) == 2 and e.details.get("amount", 0) > 0:
+                inbound[e.entity_ids[1]].append(e)
+        for acct, evs in inbound.items():
+            node = self.G.nodes.get(acct)
+            if not node or node["type"] not in ("BANK_ACCOUNT", "CRYPTO_WALLET") or len(evs) < 6:
+                continue
+            evs.sort(key=lambda e: e.occurred_at)
+            lifetime = sum(e.details["amount"] for e in evs)
+            if lifetime <= 0:
+                continue
+            per_day: dict[date, list[TimelineEvent]] = defaultdict(list)
+            for e in evs:
+                per_day[e.occurred_at.date()].append(e)
+            days = sorted(per_day)
+            best_amt, best_win = 0.0, []
+            for i, d0 in enumerate(days):
+                win = [e for d in days[i:] if (d - d0).days < WINDOW_DAYS for e in per_day[d]]
+                amt = sum(e.details["amount"] for e in win)
+                if amt > best_amt:
+                    best_amt, best_win = amt, win
+            share = best_amt / lifetime
+            senders = Counter(e.details.get("from_holder") or "unknown" for e in best_win)
+            sender_accounts = {e.entity_ids[0] for e in best_win}
+            if len(best_win) < 4 or share < 0.8 or len(sender_accounts) < 3:
+                continue
+            onward = [e for e in self.transfers if e.entity_ids and e.entity_ids[0] == acct
+                      and best_win[0].occurred_at <= e.occurred_at <= best_win[-1].occurred_at + timedelta(hours=96)]
+            out_amt = sum(e.details.get("amount", 0) for e in onward)
+            passed = out_amt / best_amt
+            if passed < 0.6:
+                continue
+            window_days = (best_win[-1].occurred_at - best_win[0].occurred_at).days + 1
+            holder = self.owner_label(acct)
+            score = min(1.0, 0.45 + 0.25 * share + 0.2 * min(passed, 1.0) + 0.1 * min(len(sender_accounts) / 6, 1))
+            out.append(_alert(
+                "transfer_burst", f"Pass-through account: {self.label(acct)} ({holder})",
+                f"₹{best_amt:,.0f} arrived in {len(best_win)} transfers from {len(sender_accounts)} unrelated accounts over "
+                f"{window_days} day(s) ({best_win[0].occurred_at:%d %b} - {best_win[-1].occurred_at:%d %b}) — "
+                f"{share:.0%} of everything this account has ever received. ₹{out_amt:,.0f} ({passed:.0%}) was forwarded "
+                f"again within four days. An account that receives its whole working life in one week and keeps none of it is "
+                f"not being used as an account; it is being used as a pipe.",
+                score, list(dict.fromkeys([acct] + self.owner.get(acct, []) + [e.entity_ids[0] for e in best_win][:10])),
+                {"window_start": best_win[0].occurred_at.isoformat(), "window_end": best_win[-1].occurred_at.isoformat(),
+                 "window_days": window_days, "transfers": len(best_win), "amount_in": best_amt,
+                 "counterparty_accounts": len(sender_accounts),
+                 "lifetime_in": lifetime, "amount_out": out_amt, "passed_through": round(passed, 3),
+                 "share_of_lifetime": round(share, 3), "counterparties": dict(senders.most_common(6)),
+                 "txn_ids": [e.details.get("txn_id") for e in best_win[:12]]}))
+        return out
+
+    def complaint_hubs(self) -> list[dict]:
+        """One account named by many complainants who have nothing else in common.
+
+        Victims of the same operation report separately, in different cities, to different police
+        stations, and each complaint is worked as its own small matter. Nothing joins them except the
+        account the money went to - which is exactly the join this sheet can make, and the reason a
+        hub is visible here after the third complaint rather than the thirty-second.
+        """
+        out = []
+        per_acct: dict[str, list[TimelineEvent]] = defaultdict(list)
+        for e in self.complaints:
+            for eid in e.entity_ids:
+                if self.G.nodes.get(eid, {}).get("type") in ("BANK_ACCOUNT", "CRYPTO_WALLET"):
+                    per_acct[eid].append(e)
+        for acct, evs in per_acct.items():
+            if len(evs) < 3:
+                continue
+            evs.sort(key=lambda e: e.occurred_at)
+            total = sum(e.details.get("amount", 0) for e in evs)
+            cities = Counter(e.details.get("city") or "unrecorded" for e in evs)
+            modus = Counter(e.details.get("modus_operandi") or "unrecorded" for e in evs)
+            span = (evs[-1].occurred_at - evs[0].occurred_at).days
+            third = evs[2].occurred_at
+            holder = self.owner_label(acct)
+            score = min(1.0, 0.55 + 0.03 * min(len(evs), 12) + (0.1 if len(cities) >= 4 else 0))
+            out.append(_alert(
+                "complaint_hub", f"{len(evs)} independent complaints name {self.label(acct)} ({holder})",
+                f"₹{total:,.0f} across {len(evs)} complaints filed between {evs[0].occurred_at:%d %b %Y} and "
+                f"{evs[-1].occurred_at:%d %b %Y} ({span} days) by complainants in {len(cities)} cities "
+                f"({', '.join(c for c, _ in cities.most_common(4))}), reporting {len(modus)} variants of one method "
+                f"({', '.join(m for m, _ in modus.most_common(2))}). No complainant is connected to any other; the account "
+                f"is the only thing they share. The third complaint, on {third:%d %b %Y}, was already enough to see it.",
+                score, [acct] + self.owner.get(acct, []),
+                {"complaints": len(evs), "total_defrauded": total, "cities": dict(cities.most_common(8)),
+                 "modus_operandi": dict(modus.most_common(6)), "span_days": span,
+                 "first": evs[0].occurred_at.isoformat(), "third": third.isoformat(), "last": evs[-1].occurred_at.isoformat(),
+                 "complaint_ids": [e.details.get("complaint_id") for e in evs[:12]]}))
         return out
 
     def night_activity(self) -> list[dict]:
@@ -500,8 +647,8 @@ class AnomalyDetector:
     # ------------------------------------------------------------------ orchestrate
     def run_all(self, projection_metrics: dict | None = None) -> list[dict]:
         alerts: list[dict] = []
-        for fn in (self.burner_phones, self.call_bursts, self.structuring, self.layering_chains, self.night_activity, self.international,
-                   self.public_records):
+        for fn in (self.burner_phones, self.call_bursts, self.structuring, self.layering_chains, self.transfer_bursts,
+                   self.complaint_hubs, self.night_activity, self.international, self.public_records):
             try:
                 alerts.extend(fn())
             except Exception as exc:  # keep other detectors alive
@@ -513,6 +660,46 @@ class AnomalyDetector:
         alerts.sort(key=lambda a: -a["score"])
         return alerts
 
+
+
+# The detector roster, as the register reports it. Each entry says what the detector looks for and
+# the one kind of record it cannot work without, so a lens can tell a reader why a detector is quiet
+# instead of leaving a gap on the page. `kinds` are the alert kinds a detector may raise; `feed` is
+# the record it reads, which lets the API separate "this sheet holds nothing of that kind" from
+# "it ran over the record and found nothing" - two very different silences.
+DETECTORS: list[dict] = [
+    {"name": "Burner phones", "method": "burner_phones", "feed": "CALL", "kinds": ["burner_phone"],
+     "needs": "call records", "looks_for": "a number that lives a fortnight, has no verified KYC, and shares a "
+                                           "handset or a contact list with a number that does"},
+    {"name": "Call bursts", "method": "call_bursts", "feed": "CALL", "kinds": ["call_burst"],
+     "needs": "call records", "looks_for": "a six-hour window where a handful of numbers talk far more than the "
+                                           "corpus baseline"},
+    {"name": "Structured deposits", "method": "structuring", "feed": "TRANSFER", "kinds": ["structuring"],
+     "needs": "bank transactions", "looks_for": "repeated credits sitting just under the reporting threshold, then "
+                                                "forwarded on"},
+    {"name": "Layering routes", "method": "layering_chains", "feed": "TRANSFER", "kinds": ["layering"],
+     "needs": "bank transactions", "looks_for": "value walked through three or more accounts inside four days with "
+                                                "most of it intact"},
+    {"name": "Pass-through accounts", "method": "transfer_bursts", "feed": "TRANSFER", "kinds": ["transfer_burst"],
+     "needs": "bank transactions", "looks_for": "an account that receives nearly its whole lifetime in one week, "
+                                                "from unrelated counterparties, and keeps none of it"},
+    {"name": "Complaint hubs", "method": "complaint_hubs", "feed": "COMPLAINT", "kinds": ["complaint_hub"],
+     "needs": "public complaints", "looks_for": "one account named by complainants in different cities who have no "
+                                                "other connection to each other"},
+    {"name": "Night activity", "method": "night_activity", "feed": "CALL", "kinds": ["night_activity"],
+     "needs": "call records", "looks_for": "a number whose traffic sits between 23:00 and 05:00 far more than the "
+                                           "population does"},
+    {"name": "International contact", "method": "international", "feed": "CALL", "kinds": ["international_contact"],
+     "needs": "call records", "looks_for": "contact with a foreign number, and how much of it happens at night"},
+    {"name": "Public-record cross-links", "method": "public_records", "feed": "WATCHLIST",
+     "kinds": ["wanted_corporate_ties", "offshore_officer_accused", "debarred_shared_directors", "mass_directorship"],
+     "needs": "watchlists and company registries",
+     "looks_for": "a wanted person controlling companies, a debarred company sharing directors, an offshore officer "
+                  "before a court, serial directorships"},
+    {"name": "Behavioural outliers", "method": "isolation_forest", "feed": "ACTORS", "kinds": ["behavioural_outlier"],
+     "needs": "at least 20 actors with phones or accounts",
+     "looks_for": "an actor whose combination of volume, reach and timing does not resemble anyone else's"},
+]
 
 def persist_alerts(db: Session, alerts: list[dict]) -> int:
     """Replace open auto-generated alerts, preserving analyst decisions on identical titles."""

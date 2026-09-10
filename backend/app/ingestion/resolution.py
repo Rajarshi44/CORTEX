@@ -18,8 +18,8 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import Entity
-from .ner import (BANK_ACCOUNT, CASE, GOV_ID, LOCATION, ORGANIZATION, PERSON, PHONE, REPORT, SOCIAL_HANDLE,
-                  VEHICLE, RuleNER)
+from .ner import (BANK_ACCOUNT, CASE, CRYPTO_WALLET, GOV_ID, LOCATION, ORGANIZATION, PERSON, PHONE, REPORT,
+                  SOCIAL_HANDLE, VEHICLE, RuleNER)
 from .quality import is_junk, role_of
 
 
@@ -52,6 +52,10 @@ def canonical_key(etype: str, text: str) -> str:
         t = ORG_SUFFIX_RE.sub("", t)
         t = re.sub(r"[^\w& ]", "", t)
         return re.sub(r"\s+", " ", t).strip().lower()
+    if etype == CRYPTO_WALLET:
+        # An on-chain address is case-insensitive in practice (EIP-55 only adds a checksum to the
+        # hex) and is quoted with and without its 0x prefix, so both forms must resolve to one node.
+        return re.sub(r"[\s-]", "", t.lower()).removeprefix("0x")
     if etype == SOCIAL_HANDLE:
         return t.lower().lstrip("@")
     if etype == GOV_ID:
@@ -259,5 +263,5 @@ class EntityResolver:
 
 ENTITY_ICON = {
     PERSON: "user", PHONE: "phone", LOCATION: "map-pin", VEHICLE: "car", ORGANIZATION: "building",
-    BANK_ACCOUNT: "landmark", CASE: "file-text", REPORT: "shield", SOCIAL_HANDLE: "at-sign",
+    BANK_ACCOUNT: "landmark", CRYPTO_WALLET: "bitcoin", CASE: "file-text", REPORT: "shield", SOCIAL_HANDLE: "at-sign",
 }

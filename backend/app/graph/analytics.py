@@ -490,7 +490,10 @@ def run_all(G: nx.Graph, D: nx.DiGraph, anomaly_hits: dict[str, float] | None = 
         "avg_clustering": round(nx.average_clustering(P, weight="weight"), 4) if P.number_of_nodes() > 1 else 0,
         "communities": len(comms), "suspicious_communities": sum(1 for c in comms if c["suspicious"]),
         "node_types": dict(type_counts), "relationship_types": dict(rel_counts),
-        "persons_of_interest": sum(1 for s in susp.values() if s["score"] >= 0.2),
+        # Actors only. An account or a handset picks up a suspicion score from the anomaly it is
+        # involved in, but it is not a person of interest, and counting it made the figure on the
+        # overview disagree with the list of people underneath it.
+        "persons_of_interest": sum(1 for n, s in susp.items() if n in P and s["score"] >= 0.2),
         "compute_backend": fastmetrics.backend(),
     }
     proj_edges = [{"source": u, "target": v, "weight": round(d["weight"], 2), "channels": d["channels"], "calls": d.get("calls", 0),

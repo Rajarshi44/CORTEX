@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import Link from "next/link";
-import { useAlerts, useAlertStatus } from "@/lib/queries";
+import { useAlerts, useAlertStatus, useDetectors } from "@/lib/queries";
 import { useSheet } from "@/lib/store";
 import SheetFooter from "@/components/sheet/SheetFooter";
 import StandingWatches from "@/components/sheet/StandingWatches";
@@ -14,16 +14,6 @@ import { format } from "date-fns";
 
 const ORDER = { critical: 0, high: 1, medium: 2, low: 3 } as const;
 const STATUSES: AlertStatus[] = ["open", "reviewing", "confirmed", "dismissed"];
-
-// The behavioural detectors and the one record each needs before it can say anything.
-const DORMANT: [string, string][] = [
-  ["Burner phones", "call records"],
-  ["Call bursts", "call records"],
-  ["Structured deposits", "bank transactions"],
-  ["Layering chains", "bank transactions"],
-  ["Night activity", "timed events"],
-  ["International contacts", "call records"],
-];
 
 function Evidence({ a }: { a: Alert }) {
   const ev = a.evidence ?? {};
@@ -48,6 +38,7 @@ function Register() {
   const [kind, setKind] = useState<string>("");
   const [openId, setOpenId] = useQueryState("id", parseAsString);
   const { data, isLoading } = useAlerts({ status: status || undefined, kind: kind || undefined, limit: 300 });
+  const { data: roster } = useDetectors();
   const patch = useAlertStatus();
   const setHighlights = useSheet((s) => s.setHighlights);
   const presentation = useSheet((s) => s.presentation);
@@ -58,7 +49,7 @@ function Register() {
     <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-[1500px] px-6 py-6">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink pb-2">
-          <div><h1 className="text-[length:var(--fs-sheet)] font-semibold leading-none tracking-tight">Register of alerts</h1><p className="mt-1 max-w-[76ch] text-ink-soft">Eight detectors run after every ingestion. Open a row to see the numbers that triggered it; marking a row records your decision in the audit log. An alert is a lead to rule out, never a finding.</p></div>
+          <div><h1 className="text-[length:var(--fs-sheet)] font-semibold leading-none tracking-tight">Register of alerts</h1><p className="mt-1 max-w-[76ch] text-ink-soft">{roster ? `${roster.total} detectors run` : "Every detector runs"} after each ingestion{roster ? `; ${roster.fired} of them found something on this sheet` : ""}. Open a row to see the numbers that triggered it; marking a row records your decision in the audit log. An alert is a lead to rule out, never a finding.</p></div>
           <div className="flex items-center gap-3">
             <label className="label flex items-center gap-1.5">Status <select value={status} onChange={(e) => setStatus(e.target.value)} className="border border-rule-strong bg-film px-1.5 py-1 text-[length:var(--fs-body)] normal-case tracking-normal"><option value="">any</option>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
             <label className="label flex items-center gap-1.5">Kind <select value={kind} onChange={(e) => setKind(e.target.value)} className="border border-rule-strong bg-film px-1.5 py-1 text-[length:var(--fs-body)] normal-case tracking-normal"><option value="">any</option>{kinds.map((k) => <option key={k} value={k}>{ALERT_KIND_LABEL[k] ?? k}</option>)}</select></label>
@@ -96,24 +87,34 @@ function Register() {
           {!isLoading && !rows.length && <li className="py-8 text-center note">No alerts match this filter. Detectors run after every ingestion.</li>}
         </ol>
 
-        {/* A short register is the honest result on public records, but a blank half-screen reads as
-            a broken page. Naming what each detector needs turns the gap into the finding it is. */}
-        {!isLoading && (
+        {/* A short register is the honest result on a narrow corpus, but a blank half-screen reads
+            as a broken page, and copy that hard-codes "two of the eight fired" is wrong the moment
+            the corpus changes. Read it off the roster, and keep the two silences apart: a detector
+            that read the record and found nothing has produced a result; one with no record to read
+            has not run at all. */}
+        {!isLoading && roster && roster.fired < roster.total && (
           <section className="mt-8 border-t border-rule pt-4">
-            <h2 className="label label-ink">What the other detectors are waiting for</h2>
-            <p className="mt-1 max-w-[76ch] note">
-              Two of the eight fired on this sheet. The rest read behaviour over time, and public records do not
-              record it: a judgment names parties, a watchlist names people, neither logs a call or a transfer.
-              Load a case corpus with call and banking data from the Sources lens and these come alive.
+            <h2 className="label label-ink">The rest of the bench</h2>
+            <p className="mt-1 max-w-[80ch] note">
+              {roster.fired} of {roster.total} detectors found something on this sheet
+              {roster.silent > 0 && <>, {roster.silent} read the record and found nothing</>}
+              {roster.starved > 0 && <>, and {roster.starved} have no record of their kind to read yet</>}.
+              A detector that ran and stayed quiet has given you an answer. One with nothing to read has not:
+              add the missing record from the Sources lens and it comes alive on the next recompute.
             </p>
-            <dl className="mt-3 grid gap-x-8 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-              {DORMANT.map(([name, needs]) => (
-                <div key={name} className="flex items-baseline justify-between gap-3 border-b border-rule pb-1">
-                  <dt className="text-[length:var(--fs-body)]">{name}</dt>
-                  <dd className="label shrink-0 text-ink-faint">needs {needs}</dd>
-                </div>
+            <ul className="mt-3 divide-y divide-rule">
+              {roster.detectors.filter((d) => !d.fired).map((d) => (
+                <li key={d.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 py-1.5">
+                  <span className="text-[length:var(--fs-body)]">{d.name}</span>
+                  <span className={cn("label shrink-0 text-right", d.state === "silent" ? "text-ink-soft" : "text-ink-faint")}>
+                    {d.state === "silent"
+                      ? `nothing found in ${d.records_held.toLocaleString("en-IN")} ${d.records_unit}`
+                      : `no ${d.needs} on this sheet`}
+                  </span>
+                  <span className="col-span-2 note">Looks for {d.looks_for}.</span>
+                </li>
               ))}
-            </dl>
+            </ul>
           </section>
         )}
         <StandingWatches />

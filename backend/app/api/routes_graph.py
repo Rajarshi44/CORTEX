@@ -212,6 +212,7 @@ SOURCE_NAMES = {
     "TRANSACTION": "FIU-IND STRs (Suspicious Transaction Reports)",
     "KYC": "C-KYC (Central KYC Registry)",
     "SURVEILLANCE": "CERT-In Surveillance Reports",
+    "REPORT": "CFSL / FSL Forensic Reports",
     "SOCIAL": "Social Media OSINT",
     "BENCHMARK": "FATF Benchmark Networks",
     "STATS": "NCRB Statistics",
@@ -232,7 +233,7 @@ def sheet_identity(db: Session) -> dict:
 
     counts = dict(db.query(Document.source_type, func.count()).group_by(Document.source_type).all())
     public = {"LEAK", "WATCHLIST", "JUDGMENT", "GLEIF", "NEWS"} & set(counts)
-    synthetic = {"FIR", "CDR", "TRANSACTION", "KYC", "SURVEILLANCE", "SOCIAL", "INTEL", "FIR_EXTRACT", "ARREST_MEMO", "RAID_REPORT", "SURVEILLANCE_REPORT", "FORENSIC_REPORT", "INTELLIGENCE_NOTE"} & set(counts)
+    synthetic = {"FIR", "CDR", "TRANSACTION", "KYC", "SURVEILLANCE", "SOCIAL", "INTEL", "REPORT", "FIR_EXTRACT", "ARREST_MEMO", "RAID_REPORT", "SURVEILLANCE_REPORT", "FORENSIC_REPORT", "INTELLIGENCE_NOTE"} & set(counts)
     srcs = [SOURCE_NAMES.get(k, k) for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])]
     if public and not synthetic:
         return {"title": "Public Record Sheet: India", "code": "PRS-IN", "kind": "real", "sources": srcs,

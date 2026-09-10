@@ -47,6 +47,49 @@ class AlertPatch(BaseModel):
     status: str
 
 
+@router.get("/alerts/detectors")
+def detectors(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)]):
+    """The detector roster, each marked with what it found and, if nothing, why.
+
+    A register showing three findings says nothing about the seven detectors that found none, and a
+    reader cannot tell a quiet corpus from a broken build. Two silences are worth telling apart:
+    a detector with no record to read at all, and a detector that read the record and found nothing.
+    Only the first is a gap in the sheet; the second is a result.
+    """
+    from sqlalchemy import func
+
+    from ..graph.anomalies import DETECTORS
+
+    counts = dict(db.query(Alert.kind, func.count()).group_by(Alert.kind).all())
+    events = dict(db.query(TimelineEvent.kind, func.count()).group_by(TimelineEvent.kind).all())
+    G = graph_cache.get(db)
+    # what each feed needs, measured on this sheet
+    have = {
+        "CALL": events.get("CALL", 0),
+        "TRANSFER": events.get("TRANSFER", 0),
+        "COMPLAINT": events.get("COMPLAINT", 0),
+        "WATCHLIST": sum(1 for _, d in G.nodes(data=True) if (d.get("attrs") or {}).get("watchlist")
+                         or (d.get("attrs") or {}).get("wanted_notice")),
+        "ACTORS": sum(1 for _, d in G.nodes(data=True) if d.get("type") == "PERSON"),
+    }
+    unit = {"CALL": "call records", "TRANSFER": "transfers", "COMPLAINT": "complaints",
+            "WATCHLIST": "watchlisted entities", "ACTORS": "persons"}
+    rows = []
+    for d in DETECTORS:
+        fired = sum(counts.get(k, 0) for k in d["kinds"])
+        held = have.get(d["feed"], 0)
+        rows.append({
+            "name": d["name"], "kinds": d["kinds"], "needs": d["needs"], "looks_for": d["looks_for"],
+            "alerts": fired, "fired": fired > 0, "records_held": held, "records_unit": unit.get(d["feed"], "records"),
+            # "silent" = ran over real records and found nothing; "starved" = nothing to read
+            "state": "fired" if fired else ("silent" if held else "starved"),
+        })
+    return {"detectors": rows, "total": len(rows), "fired": sum(1 for r in rows if r["fired"]),
+            "silent": sum(1 for r in rows if r["state"] == "silent"),
+            "starved": sum(1 for r in rows if r["state"] == "starved"),
+            "alerts": sum(counts.values())}
+
+
 @router.patch("/alerts/{alert_id}")
 def patch_alert(alert_id: str, body: AlertPatch, db: Annotated[Session, Depends(get_session)], user: Annotated[User, Depends(current_user)]):
     a = db.get(Alert, alert_id)
@@ -75,11 +118,33 @@ def ask(body: Ask, db: Annotated[Session, Depends(get_session)], user: Annotated
 
 
 @router.get("/assistant/capabilities")
-def capabilities(_: Annotated[User, Depends(current_user)]):
+def capabilities(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)]):
+    """What the investigator can be asked, phrased with names that are on this sheet.
+
+    These were a fixed list written against the synthetic corpus, so on every other sheet each
+    example named somebody who does not exist and following the suggestion failed. Questions that
+    need no name stay verbatim; the rest are filled in from the ranking, and dropped when the sheet
+    has nobody to put in them.
+    """
+    kp = [k for k in (analysis_service.snapshot(db).get("key_players") or []) if k.get("label")]
+    names = [k["label"] for k in kp[:3]]
+    orgs = [k["label"] for k in kp if k.get("type") == "ORGANIZATION"]
+
+    examples = ["Who are the key players?"]
+    if names:
+        examples.append(f"Who is {names[0]}?")
+    if len(names) >= 2:
+        examples.append(f"Path between {names[0]} and {names[1]}")
+    money = orgs[0] if orgs else (names[0] if names else None)
+    if money:
+        examples.append(f"Money flow for {money}")
+    examples.append("Which communities are suspicious?")
+    if names:
+        examples.append(f"What happens if we arrest {names[0]}?")
+    examples += ["Show the open alerts", "Predict hidden links"]
+
     return {"llm": llm.available(), "model": llm.settings.llm_model if llm.available() else None,
-            "examples": ["Who are the key players?", "Who is Rafiq Sheikh?", "Path between Salim Qureshi and Rakesh Mehta",
-                         "Show burner phones", "Money flow for Skyline Infra Ventures", "Which communities are suspicious?",
-                         "What happens if we arrest Salim Qureshi?", "Who does Vikram Naik call?", "Predict hidden links"]}
+            "examples": examples}
 
 
 @router.get("/reports/brief.md")

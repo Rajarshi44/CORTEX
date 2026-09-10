@@ -15,14 +15,22 @@ every score decomposes into reasons you can read.
 ## Run it
 
 ```bash
-# backend  ->  http://localhost:8000   (API docs at /docs)
-cd backend
-.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-
-# frontend ->  http://localhost:3000
-cd frontend-next
-npm run dev
+npm install          # once, at the repo root, for the two-process dev scripts
+npm run dev          # API on :8000, console on :3000, against whatever backend/.env points at
 ```
+
+Or start the two halves by hand:
+
+```bash
+cd backend && .venv/Scripts/python.exe -m uvicorn app.main:app --port 8000   # docs at /docs
+cd frontend-next && npm run dev                                             # http://localhost:3000
+```
+
+**The demo sheet.** `npm run dev:demo` (or `./run_demo.ps1`) loads Operation CyberHawk 2.0 from
+`demo-case-data/*.csv` into its own SQLite file and serves it on :8001 / :3001, so it never touches
+the database `backend/.env` names. `npm run demo:seed` reloads just the data. The loader is
+idempotent - entity ids are derived with uuid5 from the case, so a reload replaces the sheet rather
+than doubling it.
 
 Sign in as `analyst` / `analyst@123` (or `admin` / `admin@123` for the destructive controls).
 
@@ -46,7 +54,7 @@ Two phases. Ingestion turns records into a graph; analysis turns the graph into 
 | 6 | Accumulate | Repeated observations collapse into one weighted edge that remembers its count | `app/graph/store.py` |
 | 7 | Project | Phones and accounts fold onto their owners, leaving a person-to-person graph | `app/graph/analytics.py` |
 | 8 | Score | Suspicion from the papers, influence from the position, then rank | `app/graph/analytics.py` |
-| 9 | Detect | Eight detectors look for burner phones, structuring, layering, cross-source patterns | `app/graph/anomalies.py` |
+| 9 | Detect | Ten detectors look for burner phones, structuring, layering routes, pass-through accounts, complaint hubs, cross-source patterns | `app/graph/anomalies.py` |
 | 10 | Snapshot | Conclusions are computed once and stored, so the console loads instantly | `app/api/deps.py` |
 
 The ranking is **55% structural influence + 45% evidentiary suspicion**. Both are required, which
@@ -91,6 +99,7 @@ Everything is under `backend/app/`.
 | `provenance.py` | Turns a document into a source name and a verifiable URL |
 | `geo.py` | Indian cities, states and their coordinates |
 | `real_corpus.py` | Chains every connector to build the default public-record sheet |
+| `load_demo_case.py` | Loads `demo-case-data/*.csv` as a structured sheet, in the vocabulary the analytics read |
 | `enrich_text.py` | Re-fetches article bodies for documents stored as headlines, then extracts |
 | `cleanup.py` | One-off repairs: contamination, duplicate documents, addresses stored as places |
 | `backfill.py` | Repeatable repairs over data already loaded |
@@ -101,7 +110,7 @@ Everything is under `backend/app/`.
 | `store.py` | Edge accumulation, and the in-memory graph the analysis runs on |
 | `analytics.py` | Projection, suspicion, centralities, communities, roles, ranking, predictions |
 | `fastmetrics.py` | Chooses between rustworkx (fast) and NetworkX (weighted), and says which it used |
-| `anomalies.py` | The eight detectors |
+| `anomalies.py` | The ten detectors, and the roster the register reads to say why a quiet one is quiet |
 | `ledger.py` | The tamper-evident evidence chain |
 | `queries.py` | Everything the API reads: entity dossiers, paths, timelines, money and call profiles |
 | `case_linkage.py` | Behavioural linkage — which offences may share an offender |
@@ -153,7 +162,7 @@ Under `frontend-next/src/`. Next.js App Router.
 | `app/globals.css` | Design tokens. Read before touching any styling |
 
 **The notation matters.** Shape encodes entity type (circle person, square organisation, diamond
-phone). Line style encodes how the link was learned: solid from a structured record, dashed
+phone, hexagon account, cut hexagon crypto wallet). Line style encodes how the link was learned: solid from a structured record, dashed
 extracted from text by rules, dotted inferred by a model. Blue means money. That way a reader can
 see the strength of the evidence without asking.
 
@@ -166,7 +175,7 @@ cd backend
 .venv/Scripts/python.exe -m app.ingestion.real_corpus         # build a public-record sheet
 .venv/Scripts/python.exe -m app.ingestion.cleanup --dry-run   # show what a cleanup would remove
 .venv/Scripts/python.exe -m app.ingestion.enrich_text --limit 40   # fetch article bodies, extract
-.venv/Scripts/python.exe -m pytest -q tests                   # 30 tests
+.venv/Scripts/python.exe -m pytest -q tests                   # 54 tests
 ```
 
 ---
@@ -194,6 +203,12 @@ recompute. They are stored in separate tables for that reason, and shown as sepa
 Matching is exact on the resolver's canonical key: that rules out a watch silently widening into a
 fuzzy name search, but it cannot rule out a namesake, which is why a hit shows the record and lets
 the analyst judge rather than asserting an identity.
+
+**A quiet detector is not a broken one, and the register says which.** `/api/alerts/detectors`
+returns every detector with what it looks for and how many records of its kind the sheet actually
+holds, so the Alerts lens can tell a reader that structuring *read 104 transfers and found nothing*
+rather than leaving a gap where an explanation should be. The two silences are different findings:
+one is a result, the other is a missing source.
 
 **Scores never come from a model.** Centralities, communities and ranking are deterministic
 mathematics, so "why is this person ranked highest" always has an arithmetic answer.

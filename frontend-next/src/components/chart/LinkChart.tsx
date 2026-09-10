@@ -11,11 +11,11 @@
  * The straight run is spent at the busier end, so trunk lines fan cleanly out of the interchanges
  * and the eye can follow a single route across a crowded field.
  */
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useCallback } from "react";
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 import type { EdgeView, NodeView } from "@/lib/types";
-import { DASH, INK, MONEY_RELS, SHAPE, edgeInk, lineStyleFor, nodeRadius, relLabel, routeInk, type Shape } from "@/lib/notation";
+import { DASH, INK, MONEY_RELS, SHAPE, lineStyleFor, nodeRadius, relLabel, routeInk, type Shape } from "@/lib/notation";
 import { useSheet } from "@/lib/store";
 
 export interface ChartProps {
@@ -33,7 +33,7 @@ export interface ChartProps {
 
 type Pos = { x: number; y: number };
 type Cam = { x: number; y: number; k: number };
-const INFRA = new Set(["PHONE", "BANK_ACCOUNT", "SOCIAL_HANDLE", "VEHICLE", "GOV_ID", "LOCATION"]);
+const INFRA = new Set(["PHONE", "BANK_ACCOUNT", "CRYPTO_WALLET", "SOCIAL_HANDLE", "VEHICLE", "GOV_ID", "LOCATION"]);
 /* Canvas cannot read a CSS custom property, so the station-name face is named outright here.
    It has to stay in step with --font-condensed in globals.css. */
 const LABEL_FACE = '"Archivo Narrow", "Archivo", system-ui, sans-serif';
@@ -44,12 +44,25 @@ function drawShape(ctx: CanvasRenderingContext2D, s: Shape, x: number, y: number
     case "circle": ctx.arc(x, y, r, 0, Math.PI * 2); break;
     case "square": ctx.rect(x - r, y - r, r * 2, r * 2); break;
     case "diamond": ctx.moveTo(x, y - r * 1.15); ctx.lineTo(x + r * 1.15, y); ctx.lineTo(x, y + r * 1.15); ctx.lineTo(x - r * 1.15, y); ctx.closePath(); break;
-    case "hexagon": for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i - Math.PI / 6; const px = x + r * 1.1 * Math.cos(a), py = y + r * 1.1 * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); break;
+    case "hexagon": for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i - Math.PI / 6; const px = x + r * 1.1 * Math.cos(a), py = y + r * 1.1 * Math.sin(a); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); } ctx.closePath(); break;
     case "triangle": ctx.moveTo(x, y - r * 1.25); ctx.lineTo(x + r * 1.15, y + r * 0.85); ctx.lineTo(x - r * 1.15, y + r * 0.85); ctx.closePath(); break;
     case "rect": ctx.rect(x - r * 1.4, y - r * 0.85, r * 2.8, r * 1.7); break;
     case "pin": ctx.moveTo(x, y + r * 1.2); ctx.arc(x, y - r * 0.2, r * 0.9, Math.PI * 0.85, Math.PI * 2.15); ctx.closePath(); break;
     case "tag": ctx.moveTo(x - r * 1.2, y - r * 0.8); ctx.lineTo(x + r * 0.7, y - r * 0.8); ctx.lineTo(x + r * 1.3, y); ctx.lineTo(x + r * 0.7, y + r * 0.8); ctx.lineTo(x - r * 1.2, y + r * 0.8); ctx.closePath(); break;
     case "ring": ctx.arc(x, y, r, 0, Math.PI * 2); ctx.moveTo(x + r * 0.5, y); ctx.arc(x, y, r * 0.5, 0, Math.PI * 2, true); break;
+    // A wallet is an account the banking system cannot see: the account hexagon with its top-left
+    // corner cut off, so the two read as the same family at a glance and still never as each other.
+    case "cut-hexagon": {
+      const pts: [number, number][] = [];
+      for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i - Math.PI / 6; pts.push([x + r * 1.1 * Math.cos(a), y + r * 1.1 * Math.sin(a)]); }
+      pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+      ctx.closePath();
+      ctx.moveTo(x - r * 1.15, y - r * 0.35); ctx.lineTo(x - r * 0.35, y - r * 1.15);
+      break;
+    }
+    // A type the notation has no mark for must still be visible and still read as unrecognised;
+    // falling through an unmatched switch drew nothing at all and lost the node silently.
+    default: ctx.rect(x - r * 0.8, y - r * 0.8, r * 1.6, r * 1.6); break;
   }
 }
 
@@ -127,7 +140,6 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
   const rafRef = useRef<number>(0);
   const selected = useSheet((s) => s.selected);
   const presentation = useSheet((s) => s.presentation);
-  const [layoutKey, setLayoutKey] = useState(0);
 
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const edgeById = useMemo(() => new Map(edges.map((e) => [e.id, e])), [edges]);
@@ -198,9 +210,11 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
     const c = canvasRef.current;
     packComponents(g, next, c && c.clientHeight > 0 ? c.clientWidth / c.clientHeight : 1.6);
     posRef.current = next;
-    setLayoutKey((k) => k + 1);
-  }, [nodes, edges]);
-  useEffect(() => { fitToView(); }, [layoutKey, fitToView]);
+    // Frame the new layout here rather than through a state bump. Drawing runs off `posRef` in the
+    // animation loop below, so nothing needs to re-render for the chart to change - and a setState
+    // in this effect only bought a second render pass to do what this line does.
+    fitToView();
+  }, [nodes, edges, fitToView]);
 
   // ------------------------------------------------------------ draw
   const draw = useCallback(() => {
@@ -268,7 +282,7 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
       const isSel = n.id === selected, isHov = n.id === hover?.node, onRoute = !!route?.includes(n.id);
       const poi = n.suspicion >= 0.2;
       ctx.globalAlpha = rec ? 0.15 : 1;
-      const stationInk = isSel || onRoute ? INK.pencil : n.type === "BANK_ACCOUNT" ? INK.blue : infra ? INK.inkSoft : routeInk(n.community);
+      const stationInk = isSel || onRoute ? INK.pencil : n.type === "BANK_ACCOUNT" || n.type === "CRYPTO_WALLET" ? INK.blue : infra ? INK.inkSoft : routeInk(n.community);
       // The interchange marker: a second ring, and only ever here. It says this actor stands on
       // more than one route — which is the whole reason a broker is worth opening.
       if (interchange.has(n.id) && !infra) {

@@ -28,8 +28,10 @@ CASE = "CASE"
 REPORT = "REPORT"
 SOCIAL_HANDLE = "SOCIAL_HANDLE"
 GOV_ID = "GOV_ID"  # Aadhaar / PAN / GSTIN / passport / voter ID / DL - checksum validated, masked
+CRYPTO_WALLET = "CRYPTO_WALLET"  # on-chain address; a value-bearing account the banking system cannot see
 
-ENTITY_TYPES = [PERSON, PHONE, LOCATION, VEHICLE, ORGANIZATION, BANK_ACCOUNT, CASE, REPORT, SOCIAL_HANDLE, GOV_ID]
+ENTITY_TYPES = [PERSON, PHONE, LOCATION, VEHICLE, ORGANIZATION, BANK_ACCOUNT, CRYPTO_WALLET, CASE, REPORT,
+                SOCIAL_HANDLE, GOV_ID]
 
 
 @dataclass

@@ -19,7 +19,6 @@ import { Glyph } from "@/components/sheet/KeyRail";
 import VisualBlock from "@/components/agent/Visual";
 import ToolTrace from "@/components/agent/ToolTrace";
 import { SHAPE } from "@/lib/notation";
-import { cn } from "@/lib/utils";
 
 interface Turn {
   id: number;

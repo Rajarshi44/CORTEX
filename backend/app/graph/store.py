@@ -72,8 +72,17 @@ class RelationshipAccumulator:
             e.evidence.append((doc_id, snippet[:500], confidence, at, extractor))
 
     def flush(self, db: Session) -> tuple[int, int]:
-        """Upsert accumulated edges. Returns (created, updated)."""
+        """Upsert accumulated edges, then the evidence that cites them. Returns (created, updated).
+
+        The two passes are not cosmetic. `Evidence.relationship_id` is a bare column FK with no ORM
+        `relationship()` behind it, so the unit of work has no dependency edge to sort on and orders
+        the tables by name - inserting `evidence` before `relationships`. With SQLite's
+        `PRAGMA foreign_keys=ON` (see db.py) that is a FOREIGN KEY constraint failure on every edge
+        that carries a citation. Flushing the edges first makes the row exist before anything
+        points at it.
+        """
         created = updated = 0
+        pending: list[tuple[Relationship, list[tuple[str, str, float, datetime | None, str]]]] = []
         existing: dict[tuple[str, str, str], Relationship] = {}
         if self.edges:
             src_ids = {k[0] for k in self.edges}
@@ -106,9 +115,14 @@ class RelationshipAccumulator:
                     r.last_seen = obs.last
                 db.add(r)
                 updated += 1
-            for doc_id, snippet, conf, at, extractor in obs.evidence:
-                db.add(Evidence(document_id=doc_id, relationship_id=r.id, snippet=snippet, confidence=conf,
-                                occurred_at=at, extractor=extractor))
+            if obs.evidence:
+                pending.append((r, obs.evidence))
+        if pending:
+            db.flush()
+            for r, evidence in pending:
+                for doc_id, snippet, conf, at, extractor in evidence:
+                    db.add(Evidence(document_id=doc_id, relationship_id=r.id, snippet=snippet, confidence=conf,
+                                    occurred_at=at, extractor=extractor))
         self.edges.clear()
         return created, updated
 

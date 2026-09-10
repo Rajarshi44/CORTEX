@@ -219,7 +219,9 @@ class Investigator:
         if mf["top_destinations"]:
             lines.append("Top destinations: " + ", ".join(f"{s} (₹{v:,.0f})" for s, v in mf["top_destinations"][:5]))
         nodes = [n] + [x for x in Q.ego(self.G, n, 2) if self.G.nodes[x]["type"] in ("BANK_ACCOUNT",)][:20]
-        return self._finish(q, "money", "\n".join(lines), {k: v for k, v in mf.items() if k != "transactions"}, nodes, data=mf)
+        facts = {"subject": self._lab(n), "subject_id": n,
+                 **{k: v for k, v in mf.items() if k != "transactions"}}
+        return self._finish(q, "money", "\n".join(lines), facts, nodes, data=mf)
 
     def _calls(self, q: str, n: str) -> dict:
         cp = Q.call_profile(self.db, self.G, self.D, n)
@@ -227,7 +229,7 @@ class Investigator:
         if cp["top_contacts"]:
             lines.append("Most frequent contacts: " + ", ".join(f"**{c['owner'] or c['phone']}** ({c['calls']}×)" for c in cp["top_contacts"][:6]))
         nodes = [n] + [c["owner_id"] for c in cp["top_contacts"] if c["owner_id"]]
-        return self._finish(q, "calls", "\n".join(lines), cp, nodes, data=cp)
+        return self._finish(q, "calls", "\n".join(lines), {"subject": self._lab(n), "subject_id": n, **cp}, nodes, data=cp)
 
     def _timeline(self, q: str, n: str) -> dict:
         tl = Q.entity_timeline(self.db, n)
@@ -235,7 +237,9 @@ class Investigator:
         lines = [f"Timeline for **{self._lab(n)}**: {len(tl)} events" + (f" from {tl[0]['at'][:10]} to {tl[-1]['at'][:10]}" if tl else "") + "."]
         for t in keyev:
             lines.append(f"- {t['at'][:16]} [{t['kind']}] {t['summary'][:140]}")
-        return self._finish(q, "timeline", "\n".join(lines), {"events": keyev}, [n], data={"timeline": tl})
+        return self._finish(q, "timeline", "\n".join(lines),
+                            {"subject": self._lab(n), "subject_id": n, "events": keyev, "event_count": len(tl)},
+                            [n], data={"timeline": tl})
 
     def _predictions(self, q: str) -> dict:
         lp = self.snap.get("link_predictions", [])[:8]
@@ -273,7 +277,31 @@ class Investigator:
         return self._finish(q, "summary", "\n".join(lines), facts, [k["id"] for k in kp])
 
     def _help(self, q: str) -> dict:
-        text = ("I couldn't match that to an entity. Try: *“Who is Rafiq Sheikh?”*, *“Path between Salim Qureshi and Rakesh Mehta”*, "
-                "*“Show burner phones”*, *“Money flow for Skyline Infra Ventures”*, *“Who are the key players?”*, *“Which communities are suspicious?”*, "
-                "*“What happens if we arrest Salim Qureshi?”*")
-        return {"question": q, "intent": "help", "answer": text, "fallback_answer": text, "llm": False, "highlights": {"nodes": [], "edges": []}, "data": {}}
+        """What to ask instead, phrased with names that are actually on this sheet.
+
+        The suggestions used to be a fixed list written against the synthetic corpus. On any other
+        sheet every example named somebody who does not exist, so following the advice produced a
+        second failure - the worst thing an empty-handed answer can do. Draw them from the ranking.
+        """
+        players = [k for k in (self.snap.get("key_players") or []) if k.get("label")]
+        names = [k["label"] for k in players[:3]]
+        orgs = [k["label"] for k in players if k.get("type") == "ORGANIZATION"][:1]
+        money = orgs[0] if orgs else (names[0] if names else None)
+
+        tries = []
+        if names:
+            tries.append(f"“Who is {names[0]}?”")
+        if len(names) >= 2:
+            tries.append(f"“Path between {names[0]} and {names[1]}”")
+        if money:
+            tries.append(f"“Money flow for {money}”")
+        tries += ["“Who are the key players?”", "“Which communities are suspicious?”"]
+        if names:
+            tries.append(f"“What happens if we arrest {names[0]}?”")
+        tries.append("“Show the open alerts”")
+
+        lead = ("I couldn't match that to an entity on this sheet." if names
+                else "I couldn't match that to an entity, and this sheet has no ranked actors yet.")
+        text = lead + " Try: " + ", ".join(f"*{t}*" for t in tries)
+        return {"question": q, "intent": "help", "answer": text, "fallback_answer": text, "llm": False,
+                "highlights": {"nodes": [], "edges": []}, "data": {"suggestions": tries}}

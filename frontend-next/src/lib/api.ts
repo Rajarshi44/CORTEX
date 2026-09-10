@@ -1,6 +1,6 @@
 import type {
   AiStatus, Alert, AlertStatus, AssistantAnswer, Community, DocumentDetail, DocumentSummary, Dossier, GeoPayload,
-  EntityPage, GraphPayload, IngestStatus, KeyPlayer, Broker, LedgerVerify, LinkPrediction, LinkageReport, NodeView, PathHop,
+  DetectorRoster, EntityPage, GraphPayload, IngestStatus, KeyPlayer, Broker, LedgerVerify, LinkPrediction, LinkageReport, NodeView, PathHop,
   RemovalImpact, SourceInfo, SourceReport, Summary, TimelineEvent, User, SheetIdentity, Note,
   Severity, Watch, WatchHit, WatchKind, HitStatus,
 } from "./types";
@@ -106,6 +106,7 @@ export const api = {
   // ---- alerts
   alerts: (p: { status?: string; kind?: string; severity?: string; entity?: string; limit?: number } = {}) => request<Alert[]>(`/api/alerts${qs(p)}`),
   patchAlert: (id: string, status: AlertStatus) => request<Alert>(`/api/alerts/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  detectors: () => request<DetectorRoster>("/api/alerts/detectors"),
 
   // ---- assistant & AI
   ask: (question: string) => request<AssistantAnswer>("/api/assistant/ask", { method: "POST", body: JSON.stringify({ question }) }),

@@ -98,6 +98,10 @@ export async function streamAgent(
   if (res.status === 401) {
     setToken(null);
     if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      // A hard navigation on purpose, as in lib/api.ts: the session is gone, so every query cache
+      // and store still holding the previous user's records has to go with it, and only a full
+      // document load clears them.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
     }
     throw new ApiError(401, "Session expired");

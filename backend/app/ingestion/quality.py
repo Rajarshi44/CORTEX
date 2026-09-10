@@ -19,14 +19,14 @@ from __future__ import annotations
 import re
 
 from .geo import COUNTRIES
-from .ner import BANK_ACCOUNT, GOV_ID, LOCATION, ORGANIZATION, PERSON, PHONE
+from .ner import BANK_ACCOUNT, CRYPTO_WALLET, GOV_ID, LOCATION, ORGANIZATION, PERSON, PHONE
 
 # --- 1. artifacts ------------------------------------------------------------------------------
 
 # Identifiers are legitimately all digits and carry no letters. A bare number is an artifact only
 # where a *name* was expected; rejecting it everywhere silently deleted every phone number, which
 # took call records, USES_PHONE links and the burner-phone detector with it.
-NUMERIC_TYPES = {PHONE, BANK_ACCOUNT, GOV_ID}
+NUMERIC_TYPES = {PHONE, BANK_ACCOUNT, GOV_ID, CRYPTO_WALLET}
 
 # Bare ISO codes reaching entity resolution are always a connector leaking a field, never a place.
 ISO2 = set(COUNTRIES) | {"AF", "AL", "DZ", "AR", "AT", "AZ", "BH", "BY", "BG", "KH", "CL", "CO", "HR",
