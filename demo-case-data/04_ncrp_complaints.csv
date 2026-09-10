@@ -1,13 +1,13 @@
 complaint_id,filing_date,complainant_name,complainant_city,complainant_state,amount_defrauded_inr,modus_operandi,linked_account,linked_account_holder,police_station,investigation_status,notes
-NCRP/2025/10452,2026-03-25,Complainant 1,Delhi,Delhi,1500000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Delhi Cyber Cell,Under Investigation,Routine investigation.
-NCRP/2025/11234,2026-04-25,Complainant 2,Mumbai,Maharashtra,2500000,Fake CBI/ED Notice,A001,NGO - Sirmaur HP (Dev Raj - accused),Mumbai Cyber Cell,Under Investigation,Routine investigation.
-NCRP/2025/12567,2026-05-18,Complainant 3,Pune,Maharashtra,1800000,Impersonation of Police Officer,A001,NGO - Sirmaur HP (Dev Raj - accused),Pune Cyber Cell,FIR Registered,Routine investigation.
-NCRP/2025/13789,2026-06-10,Complainant 4,Kolkata,West Bengal,3000000,Fake Court Order via WhatsApp,A001,NGO - Sirmaur HP (Dev Raj - accused),Kolkata Cyber Cell,Under Investigation,Routine investigation.
-NCRP/2025/14890,2026-07-22,Complainant 5,Chennai,Tamil Nadu,1200000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Chennai Cyber Cell,Pending,Routine investigation.
-NCRP/2025/15901,2026-08-28,Complainant 6,Bengaluru,Karnataka,2200000,Fake CBI/ED Notice,A001,NGO - Sirmaur HP (Dev Raj - accused),Bengaluru Cyber Cell,Under Investigation,Routine investigation.
-NCRP/2025/16123,2026-09-15,Complainant 7,Jaipur,Rajasthan,1900000,Impersonation of Police Officer,A001,NGO - Sirmaur HP (Dev Raj - accused),Jaipur Cyber Cell,FIR Registered,Routine investigation.
-NCRP/2025/17345,2026-10-05,Complainant 8,Lucknow,Uttar Pradesh,2800000,Fake Court Order via WhatsApp,A001,NGO - Sirmaur HP (Dev Raj - accused),Lucknow Cyber Cell,Under Investigation,Routine investigation.
-NCRP/2025/18456,2026-10-20,Complainant 9,Delhi,Delhi,1600000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Delhi Cyber Cell,Under Investigation,Routine investigation.
-NCRP/2025/19567,2026-10-30,Complainant 10,Mumbai,Maharashtra,2100000,Fake CBI/ED Notice,A001,NGO - Sirmaur HP (Dev Raj - accused),Mumbai Cyber Cell,FIR Registered,Routine investigation.
-NCRP/2025/20678,2026-11-05,Complainant 11,Pune,Maharashtra,1400000,Impersonation of Police Officer,A001,NGO - Sirmaur HP (Dev Raj - accused),Pune Cyber Cell,Chargesheet Filed,Routine investigation.
-NCRP/2025/21789,2026-11-12,Victim,Delhi,Delhi,11600000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Delhi Cyber Cell,FIR Registered,This complaint broke the case.
+NCRP/2025/10452,2025-03-25,Complainant 1,Delhi,Delhi,1500000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Delhi Cyber Cell,Under Investigation,Routine investigation.
+NCRP/2025/11234,2025-04-25,Complainant 2,Mumbai,Maharashtra,2500000,Fake CBI/ED Notice,A001,NGO - Sirmaur HP (Dev Raj - accused),Mumbai Cyber Cell,Under Investigation,Routine investigation.
+NCRP/2025/12567,2025-05-18,Complainant 3,Pune,Maharashtra,1800000,Impersonation of Police Officer,A001,NGO - Sirmaur HP (Dev Raj - accused),Pune Cyber Cell,FIR Registered,Routine investigation.
+NCRP/2025/13789,2025-06-10,Complainant 4,Kolkata,West Bengal,3000000,Fake Court Order via WhatsApp,A001,NGO - Sirmaur HP (Dev Raj - accused),Kolkata Cyber Cell,Under Investigation,Routine investigation.
+NCRP/2025/14890,2025-07-22,Complainant 5,Chennai,Tamil Nadu,1200000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Chennai Cyber Cell,Pending,Routine investigation.
+NCRP/2025/15901,2025-08-28,Complainant 6,Bengaluru,Karnataka,2200000,Fake CBI/ED Notice,A001,NGO - Sirmaur HP (Dev Raj - accused),Bengaluru Cyber Cell,Under Investigation,Routine investigation.
+NCRP/2025/16123,2025-09-15,Complainant 7,Jaipur,Rajasthan,1900000,Impersonation of Police Officer,A001,NGO - Sirmaur HP (Dev Raj - accused),Jaipur Cyber Cell,FIR Registered,Routine investigation.
+NCRP/2025/17345,2025-10-05,Complainant 8,Lucknow,Uttar Pradesh,2800000,Fake Court Order via WhatsApp,A001,NGO - Sirmaur HP (Dev Raj - accused),Lucknow Cyber Cell,Under Investigation,Routine investigation.
+NCRP/2025/18456,2025-10-20,Complainant 9,Delhi,Delhi,1600000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Delhi Cyber Cell,Under Investigation,Routine investigation.
+NCRP/2025/19567,2025-10-30,Complainant 10,Mumbai,Maharashtra,2100000,Fake CBI/ED Notice,A001,NGO - Sirmaur HP (Dev Raj - accused),Mumbai Cyber Cell,FIR Registered,Routine investigation.
+NCRP/2025/20678,2025-11-05,Complainant 11,Pune,Maharashtra,1400000,Impersonation of Police Officer,A001,NGO - Sirmaur HP (Dev Raj - accused),Pune Cyber Cell,Chargesheet Filed,Routine investigation.
+NCRP/2025/21789,2025-11-12,Victim,Delhi,Delhi,11600000,Digital Arrest Scam,A001,NGO - Sirmaur HP (Dev Raj - accused),Delhi Cyber Cell,FIR Registered,This complaint broke the case.
