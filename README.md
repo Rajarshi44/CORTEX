@@ -22,8 +22,10 @@ npm run dev          # API on :8000, console on :3000, against whatever backend/
 Or start the two halves by hand:
 
 ```bash
-cd backend && .venv/Scripts/python.exe -m uvicorn app.main:app --port 8000   # docs at /docs
-cd frontend-next && npm run dev                                             # http://localhost:3000
+cd backend
+.venv/Scripts/python.exe download_model.py                                  # download the ONNX embedding model (~130MB)
+.venv/Scripts/python.exe -m uvicorn app.main:app --port 8000                # docs at /docs
+cd ../frontend-next && npm run dev                                          # http://localhost:3000
 ```
 
 **The demo sheet.** `npm run dev:demo` (or `./run_demo.ps1`) loads Operation CyberHawk 2.0 from
