@@ -1,0 +1,5 @@
+.venv/
+data/cna.db*
+data/cache/
+data/icij/
+__pycache__/

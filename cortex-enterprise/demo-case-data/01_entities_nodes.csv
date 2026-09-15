@@ -1,0 +1,42 @@
+entity_id,entity_type,name,alias,age,role_in_network,sub_network,location_city,location_state,status,risk_flag,notes
+P001,PERSON,Victim,,82,Complainant,SN-A,Delhi,Delhi,Complainant,LOW,
+P002,PERSON,Prabhakar Kumar,,,Caller/Operator,SN-A,Nalanda,Bihar,Accused,HIGH,
+P003,PERSON,Rupesh Kumar Singh,,,Recruiter/Coordinator,SN-A,Vaishali,Bihar,Accused,HIGH,
+P004,PERSON,Dev Raj,,,NGO Front Operator,SN-A,Sirmaur,HP,Accused,HIGH,
+P005,PERSON,Rahul,Happy,,Main Beneficiary,SN-B,,,At Large,HIGH,
+P006,PERSON,Amit Verma,,19,Student Mule,SN-B,,,Accused,MED,[synthetic name]
+P007,PERSON,Sunil Yadav,,19,Student Mule,SN-B,,,Accused,MED,[synthetic name]
+P008,PERSON,Mohammad Irfan,,,Account Holder Tier,SN-C,,,Accused,LOW,[synthetic name]
+P009,PERSON,Vijay Sharma,,,Account Holder Tier,SN-C,,,Accused,LOW,[synthetic name]
+P010,PERSON,Ravi Tiwari,,,Account Holder Tier,SN-C,,,Accused,LOW,[synthetic name]
+P011,PERSON,Deepak Mehra,,,Middleman Tier,SN-C,,,Accused,MED,[synthetic name]
+P012,PERSON,Sanjay Gupta,,,Middleman Tier,SN-C,,,Accused,MED,[synthetic name]
+P013,PERSON,Arjun Das,,,End-user Tier,SN-C,,,Accused,HIGH,[synthetic name]
+P014,PERSON,Nitin Rawat,,,End-user Tier,SN-C,,,Accused,HIGH,[synthetic name]
+P015,PERSON,Abdul Karim,,,Hawala Operator,SN-C,,,Accused,HIGH,[synthetic name]
+P016,PERSON,Vikram Joshi,,,Crypto Converter,SN-C,,,Accused,HIGH,[synthetic name]
+O001,ORGANIZATION,Unidentified NGO,,,Money Laundering Front,SN-A,Sirmaur,HP,Active,HIGH,
+O002,ORGANIZATION,Transnational Hawala Network,,,Hawala Network,SN-C,,,Active,HIGH,
+O003,ORGANIZATION,CyberHawk Mule Ring,,,Mule Ring,SN-B,,,Active,HIGH,
+A001,BANK_ACCOUNT,NGO Current Account - [Illustrative: XXXX1234],,,Hub Node,SN-A,,,Active,HIGH,"32 NCRP complaints, ~24 crore"
+A002,BANK_ACCOUNT,Victim Savings Account - [Illustrative: XXXX5678],,,Victim Account,SN-A,Delhi,Delhi,Active,LOW,
+A003,BANK_ACCOUNT,Mule Account 1 - [Illustrative: XXXX1111],,,Mule Account,SN-B,,,Active,MED,
+A004,BANK_ACCOUNT,Mule Account 2 - [Illustrative: XXXX2222],,,Mule Account,SN-B,,,Active,MED,
+A005,BANK_ACCOUNT,Mule Account 3 - [Illustrative: XXXX3333],,,Mule Account,SN-B,,,Active,MED,
+A006,BANK_ACCOUNT,IFSO Primary Account - [Illustrative: XXXX4444],,,Primary Account,SN-C,,,Active,HIGH,"10000+ txns in 5 days, 5.24 crore"
+A007,BANK_ACCOUNT,IFSO Secondary Account 1 - [Illustrative: XXXX5555],,,Secondary Account,SN-C,,,Active,MED,
+A008,BANK_ACCOUNT,IFSO Secondary Account 2 - [Illustrative: XXXX6666],,,Secondary Account,SN-C,,,Active,MED,
+A009,BANK_ACCOUNT,Hawala Clearing Account - [Illustrative: XXXX7777],,,Clearing Account,SN-C,,,Active,HIGH,
+A010,BANK_ACCOUNT,Intermediary Account - [Illustrative: XXXX8888],,,Intermediary Account,SN-A,,Bihar,Active,MED,
+A011,BANK_ACCOUNT,Prabhakar Personal Account - [Illustrative: XXXX9999],,,Personal Account,SN-A,,Bihar,Active,MED,
+A012,BANK_ACCOUNT,Rupesh Personal Account - [Illustrative: XXXX0000],,,Personal Account,SN-A,,Bihar,Active,MED,
+PH001,PHONE_NUMBER,WhatsApp Spoofed Number - [Illustrative: +919999999991],,,Digital Arrest Call,SN-A,,,Active,HIGH,
+PH002,PHONE_NUMBER,Victim Phone - [Illustrative: +919999999992],,,Victim Phone,SN-A,Delhi,Delhi,Active,LOW,
+PH003,PHONE_NUMBER,Prabhakar Phone - [Illustrative: +919999999993],,,Operator Phone,SN-A,,Bihar,Active,MED,
+PH004,PHONE_NUMBER,Rahul Phone - [Illustrative: +919999999994],Happy,,Operator Phone,SN-B,,,Active,HIGH,
+PH005,PHONE_NUMBER,Dev Raj Phone - [Illustrative: +919999999995],,,Operator Phone,SN-A,Sirmaur,HP,Active,HIGH,
+SIM001,SIM_CARD,Mule SIM 1 - [Illustrative: 1111111111],,,Mule SIM,SN-B,,,Active,MED,procured by students
+SIM002,SIM_CARD,Mule SIM 2 - [Illustrative: 2222222222],,,Mule SIM,SN-B,,,Active,MED,
+SIM003,SIM_CARD,Mule SIM 3 - [Illustrative: 3333333333],,,Mule SIM,SN-B,,,Active,MED,
+CW001,CRYPTO_WALLET,IFSO Crypto Wallet 1 - [Illustrative: 0x1111],,,Crypto Wallet,SN-C,,,Active,HIGH,
+CW002,CRYPTO_WALLET,IFSO Crypto Wallet 2 - [Illustrative: 0x2222],,,Crypto Wallet,SN-C,,,Active,HIGH,

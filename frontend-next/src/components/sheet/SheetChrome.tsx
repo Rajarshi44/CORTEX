@@ -10,6 +10,7 @@ import { Search, Presentation, LogOut } from "lucide-react";
 const LENSES = [
   ["/overview", "Overview"], ["/chart", "Chart"], ["/players", "Players"], ["/alerts", "Alerts"],
   ["/map", "Map"], ["/investigator", "Investigator"], ["/sources", "Sources"], ["/ledger", "Ledger"],
+  ["/system", "System"],
 ] as const;
 
 export default function SheetChrome() {

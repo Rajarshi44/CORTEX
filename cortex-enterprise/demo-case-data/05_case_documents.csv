@@ -1,0 +1,17 @@
+doc_id,doc_type,title,date_created,date_filed,issuing_authority,police_station,jurisdiction,brief_description,linked_entity_ids,sub_network,classification,notes
+DOC-001,FIR_EXTRACT,"FIR No. [Illustrative: XXX/2025] - Digital Arrest Fraud",2025-11-20,2025-11-20,Delhi Crime Branch Cyber Cell,Cyber Cell HQ,Delhi NCR,"82-year-old male victim shown fake arrest order via WhatsApp video call. Under psychological duress transferred ₹1,16,00,000. Amount traced to NGO current account in Himachal Pradesh.","P001;P002;P003;P004",SN-A,CONFIDENTIAL,"P001 (victim), P002, P003, P004 accused"
+DOC-002,ARREST_MEMO,Arrest Memo: Prabhakar Kumar,2025-12-05,2025-12-05,Delhi Police,Nalanda,Bihar,Arrest of caller/operator in digital arrest scam.,P002,SN-A,RESTRICTED,Arrested from Nalanda Bihar
+DOC-003,ARREST_MEMO,Arrest Memo: Rupesh Kumar Singh,2025-12-06,2025-12-06,Delhi Police,Vaishali,Bihar,Arrest of recruiter for the operation.,P003,SN-A,RESTRICTED,Arrested from Vaishali Bihar
+DOC-004,ARREST_MEMO,Arrest Memo: Dev Raj,2025-12-08,2025-12-08,Delhi Police,Sirmaur,Himachal Pradesh,Arrest of NGO front operator.,P004,SN-A,RESTRICTED,Arrested from Sirmaur HP
+DOC-005,FIR_EXTRACT,"FIR No. [Illustrative: 112/2025] - CyberHawk 2.0 operation",2025-12-01,2025-12-01,NCRP,Cyber Hawk HQ,National,"Two 19-year-old students arrested for opening mule accounts and SIM cards. ₹1,08,000 traced across 3 accounts. Main beneficiary 'Rahul alias Happy' at large.","P005;P006;P007",SN-B,CONFIDENTIAL,Main accused P005 absconding
+DOC-006,ARREST_MEMO,Arrest Memo: Amit Verma,2025-12-02,2025-12-02,Delhi Police,Student Residence,Delhi,Arrest of 19yo student mule.,P006,SN-B,RESTRICTED,Synthetic name Amit Verma
+DOC-007,ARREST_MEMO,Arrest Memo: Sunil Yadav,2025-12-02,2025-12-02,Delhi Police,Student Residence,Delhi,Arrest of 19yo student mule.,P007,SN-B,RESTRICTED,Synthetic name Sunil Yadav
+DOC-008,RAID_REPORT,Dwarka Hotel Raid Report,2025-11-26,2025-11-26,IFSO Special Cell,Dwarka PS,Delhi,"4 initial arrests during raid. Hotel used as operational base. Multiple devices, SIM cards, and financial documents seized.","P008;P009;P010;P011",SN-C,CONFIDENTIAL,Operation executed successfully
+DOC-009,SURVEILLANCE_REPORT,Pre-raid surveillance of Dwarka hotel,2025-11-25,2025-11-25,IFSO,Dwarka,Delhi,"Surveillance logs from 20-25 Nov 2025 showing high footfall and suspicious activity at the targeted hotel.",,SN-C,SECRET,Led to raid on Nov 26
+DOC-010,ARREST_MEMO,Arrest Memo: Follow-on 1,2025-12-03,2025-12-03,IFSO,Dwarka,Delhi,Follow-on arrest after raid.,P012,SN-C,RESTRICTED,
+DOC-011,ARREST_MEMO,Arrest Memo: Follow-on 2,2025-12-04,2025-12-04,IFSO,Dwarka,Delhi,Follow-on arrest after raid.,P013,SN-C,RESTRICTED,
+DOC-012,ARREST_MEMO,Arrest Memo: Follow-on 3,2025-12-05,2025-12-05,IFSO,Dwarka,Delhi,Follow-on arrest after raid.,P014,SN-C,RESTRICTED,
+DOC-013,ARREST_MEMO,Arrest Memo: Follow-on 4,2025-12-06,2025-12-06,IFSO,Dwarka,Delhi,Follow-on arrest after raid.,P015,SN-C,RESTRICTED,
+DOC-014,ARREST_MEMO,Arrest Memo: Follow-on 5,2025-12-07,2025-12-07,IFSO,Dwarka,Delhi,Follow-on arrest after raid.,P016,SN-C,RESTRICTED,
+DOC-015,FORENSIC_REPORT,Digital forensics on seized devices,2025-12-09,2025-12-09,FSL,Delhi FSL,Delhi,Analysis showing 10000+ transactions on one account in 5 days.,,SN-C,CONFIDENTIAL,Analysis of devices seized during Dwarka raid
+DOC-016,INTELLIGENCE_NOTE,"Cross-network analysis linking SN-A, SN-B, SN-C",2025-12-10,2025-12-10,Intelligence Bureau,HQ,National,Noting geographic overlap and modus operandi similarities across the networks.,,ALL,SECRET,Strategic intelligence

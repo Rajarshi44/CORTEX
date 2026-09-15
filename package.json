@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && .\\.venv\\Scripts\\python -m uvicorn app.main:app --reload",
+    "dev:backend": "cd backend && .\\venv\\Scripts\\python -m uvicorn app.main:app --reload",
     "dev:frontend": "cd frontend-next && npm run dev",
-    "demo:seed": "cd backend && cross-env CNA_DATABASE_URL=sqlite:///./demo.db CNA_DEFAULT_CORPUS=none .\\.venv\\Scripts\\python -m app.ingestion.load_demo_case",
+    "demo:seed": "cd backend && cross-env CNA_DATABASE_URL=sqlite:///./demo.db CNA_DEFAULT_CORPUS=none .\\venv\\Scripts\\python -m app.ingestion.load_demo_case",
     "dev:demo": "npm run demo:seed && concurrently -n backend,frontend -c blue,magenta \"npm run dev:demo:backend\" \"npm run dev:demo:frontend\"",
-    "dev:demo:backend": "cd backend && cross-env CNA_DATABASE_URL=sqlite:///./demo.db CNA_DEFAULT_CORPUS=none .\\.venv\\Scripts\\python -m uvicorn app.main:app --port 8001",
+    "dev:demo:backend": "cd backend && cross-env CNA_DATABASE_URL=sqlite:///./demo.db CNA_DEFAULT_CORPUS=none .\\venv\\Scripts\\python -m uvicorn app.main:app --port 8001",
     "dev:demo:frontend": "cd frontend-next && cross-env NEXT_PUBLIC_API_URL=http://localhost:8001 npm run dev:demo"
   },
   "devDependencies": {

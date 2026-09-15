@@ -6,7 +6,7 @@
 
 /* Tailwind scans every file under the repo for class candidates, markdown and JSON included. A
    design document that quotes a class pattern is therefore compiled as a real utility, and a
-   wildcard inside one — `text-[length:var(--fs-*)]` — emits `font-size: var(--fs-*)`, which is
+   wildcard inside one — text-length-var-fs-wildcard — emits font-size: var(--fs-*), which is
    not parseable CSS and takes the entire stylesheet, and every route with it, down. Documentation
    describes the system; it is not a source of it. */
 @source not "../../DESIGN.md";
