@@ -76,6 +76,8 @@ function Register() {
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="label text-ink-faint">Mark</span>
                       {STATUSES.map((s) => <button key={s} type="button" disabled={a.status === s} onClick={() => patch.mutate({ id: a.id, status: s })} className={cn("label border px-2 py-1", a.status === s ? "border-ink bg-ink text-film" : "border-rule-strong hover:border-ink")}>{s}</button>)}
+                      <span className="label text-ink-faint ml-2 border-l border-rule pl-3">Review</span>
+                      {(["pending", "reviewed", "escalated"] as const).map((s) => <button key={s} type="button" disabled={a.review_status === s} onClick={() => patch.mutate({ id: a.id, review_status: s })} className={cn("label border px-2 py-1", a.review_status === s ? "border-ink bg-ink text-film" : "border-rule-strong hover:border-ink")}>{s}</button>)}
                       <button type="button" onClick={() => setHighlights(a.entities.map((e) => e.id), `Alert emphasised: ${a.title}`)} className="label ml-auto text-ink-soft hover:text-pencil">emphasise on chart</button>
                       <Link href={`/chart${a.entities[0] ? `?focus=${a.entities[0].id}` : ""}`} className="label text-pencil hover:underline">redraw around it</Link>
                     </div>

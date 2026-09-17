@@ -1,7 +1,7 @@
 from typing import Annotated, Any, Dict, List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import String, or_
 
 from ..db import Entity, Alert, Document, get_session
 from ..auth import current_user, User
@@ -23,7 +23,7 @@ def global_search(q: str, db: Annotated[Session, Depends(get_session)], _: Annot
             Entity.label.ilike(query_term),
             Entity.canonical_key.ilike(query_term),
             # Simple cast to string for JSON search (works in SQLite & Postgres)
-            Entity.attributes.cast(str).ilike(query_term) 
+            Entity.attributes.cast(String).ilike(query_term) 
         )
     ).limit(10).all()
     

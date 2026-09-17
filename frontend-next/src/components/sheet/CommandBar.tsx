@@ -23,7 +23,7 @@ export default function CommandBar() {
   const presentation = useSheet((s) => s.presentation);
   const [q, setQ] = useState("");
   const router = useRouter();
-  const { data: hits } = useQuery({ queryKey: ["cmd", q], queryFn: () => api.entities({ q, limit: 12 }).then((p) => p.items), enabled: open && q.trim().length >= 2, staleTime: 10_000 });
+  const { data: hits } = useQuery({ queryKey: ["cmd", q], queryFn: () => api.globalSearch(q), enabled: open && q.trim().length >= 2, staleTime: 10_000 });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -45,14 +45,35 @@ export default function CommandBar() {
         </div>
         <Command.List className="max-h-[52vh] overflow-y-auto p-1.5">
           <Command.Empty className="px-3 py-6 text-center note">{q.length < 2 ? "Type at least two characters." : "No entity matches. Press Enter to ask the investigator."}</Command.Empty>
-          {hits && hits.length > 0 && (
+          {hits && hits.entities?.length > 0 && (
             <Command.Group heading={<span className="label px-2">Entities</span>}>
-              {hits.map((n) => (
+              {hits.entities.map((n) => (
                 <Command.Item key={n.id} value={`${n.label} ${n.id}`} onSelect={() => { select(n.id); go(`/chart?focus=${n.id}`); }} className="flex cursor-pointer items-center gap-3 rounded-[2px] px-2 py-1.5 aria-selected:bg-film-deep">
-                  <Glyph shape={SHAPE[n.type]} size={14} />
-                  <span className="flex-1 truncate">{n.label}{n.aliases?.length ? <span className="text-ink-faint"> @ {n.aliases.join(", ")}</span> : null}</span>
-                  <span className="label text-ink-faint">{TYPE_LABEL[n.type]}</span>
-                  {n.priority > 0 && <span className="figure text-[length:var(--fs-note)] text-pencil">{n.priority.toFixed(2)}</span>}
+                  <Glyph shape={SHAPE[n.type as keyof typeof SHAPE] ?? "circle"} size={14} />
+                  <span className="flex-1 truncate">{n.label}</span>
+                  <span className="label text-ink-faint">{TYPE_LABEL[n.type as keyof typeof TYPE_LABEL] ?? n.type}</span>
+                  {n.risk_score > 0 && <span className="figure text-[length:var(--fs-note)] text-amber">{n.risk_score.toFixed(2)}</span>}
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
+          {hits && hits.alerts?.length > 0 && (
+            <Command.Group heading={<span className="label px-2">Alerts</span>}>
+              {hits.alerts.map((a) => (
+                <Command.Item key={a.id} value={`${a.title} ${a.id}`} onSelect={() => { go(`/alerts`); }} className="flex cursor-pointer items-center gap-3 rounded-[2px] px-2 py-1.5 aria-selected:bg-film-deep">
+                  <span className="flex-1 truncate">{a.title}</span>
+                  <span className="label text-ink-faint">{a.severity}</span>
+                  {a.review_status === "pending" && <span className="label text-amber">Pending</span>}
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
+          {hits && hits.documents?.length > 0 && (
+            <Command.Group heading={<span className="label px-2">Documents</span>}>
+              {hits.documents.map((d) => (
+                <Command.Item key={d.id} value={`${d.title} ${d.id}`} onSelect={() => { go(`/sources`); }} className="flex cursor-pointer items-center gap-3 rounded-[2px] px-2 py-1.5 aria-selected:bg-film-deep">
+                  <span className="flex-1 truncate">{d.title}</span>
+                  <span className="label text-ink-faint">{d.source_type}</span>
                 </Command.Item>
               ))}
             </Command.Group>

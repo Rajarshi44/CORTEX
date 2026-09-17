@@ -14,47 +14,41 @@
 @source not "../../../.impeccable";
 @source not "../../../README.md";
 
-/* ------------------------------------------------------------------ the board
-   One world: Indian Railways information design. Platform terrazzo underfoot, one
-   dark board where amber is allowed to burn, route colour on the line edges only.
-   Every token below is a material from that world; nothing is a generic UI grey.
-------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------
+   Premium Utilitarian Minimalism & Editorial UI
+   A high-contrast warm monochrome palette with bespoke typography.
+------------------------------------------------------------------ */
 :root {
-  /* Platform, not paper. Terrazzo grey concourse under tubelight; the board is the only dark
-     field on the page and the only place amber is allowed to burn. */
-  --film: #e4e7e4;            /* platform terrazzo */
-  --film-deep: #d6dad6;       /* rails, gutters, inset tracks */
-  --film-lift: #eef0ed;       /* raised card, timetable paper */
-  --rule: #c3c8c3;
-  --rule-strong: #a7aea7;
-  --ink: #141613;             /* board black, doubles as type */
-  --ink-soft: #4c534c;
-  --ink-faint: #606760;
+  /* Warm Bone/Off-White Backgrounds */
+  --film: #F7F6F3;            /* Canvas */
+  --film-deep: #EAEAEA;       /* Structural Borders / Dividers */
+  --film-lift: #FFFFFF;       /* Primary Surface (Cards) */
+  
+  --rule: #EAEAEA;
+  --rule-strong: rgba(0, 0, 0, 0.06);
+  
+  /* Off-black / charcoal ink */
+  --ink: #111111;             /* Primary Text */
+  --ink-soft: #2F3437;        
+  --ink-faint: #787774;       /* Secondary/Muted Text */
 
-  /* signal amber: the lit lamp. Only ever on the board, or on a live status mark. */
-  --amber: #f0a81e;
-  --amber-deep: #6b4600;      /* the only amber allowed to carry text on the light ground */
-  --amber-wash: rgba(240, 168, 30, 0.14);
+  /* Muted Pastels (Spot Colors) */
+  --amber: #FBF3DB;           /* Pale Yellow background */
+  --amber-deep: #956400;      /* Pale Yellow Text */
+  --amber-wash: rgba(251, 243, 219, 0.5);
 
-  /* signal red: stop. Critical alerts, destructive actions, nothing else. */
-  --pencil: #b02821;          /* signal red; kept token name, 200+ call sites */
-  --pencil-soft: #e39d99;
-  --pencil-wash: rgba(200, 50, 43, 0.09);
+  --pencil: #9F2F2D;          /* Pale Red Text */
+  --pencil-soft: #FDEBEC;     /* Pale Red background */
+  --pencil-wash: rgba(253, 235, 236, 0.5);
 
-  /* route colours: one per community, carried on line edges only, never as a fill behind text */
-  --blue: #1f6fb2;
-  --blue-soft: #9dc0dd;
-  --blue-wash: rgba(31, 111, 178, 0.09);
-  --green: #2e7d4f;
+  --blue: #1F6C9F;            /* Pale Blue Text */
+  --blue-soft: #E1F3FE;       /* Pale Blue background */
+  --blue-wash: rgba(225, 243, 254, 0.5);
+
+  --green: #346538;           /* Pale Green Text */
   --violet: #7a4fa3;
-  --route-1: #c8322b;
-  --route-2: #1f6fb2;
-  --route-3: #2e7d4f;
-  --route-4: #b87a06;
-  --route-5: #7a4fa3;
-  --route-6: #0f7b8a;
 
-  /* shadcn contract, mapped onto the platform world */
+  /* shadcn contract */
   --background: var(--film);
   --foreground: var(--ink);
   --card: var(--film-lift);
@@ -66,7 +60,7 @@
   --secondary: var(--film-deep);
   --secondary-foreground: var(--ink);
   --muted: var(--film-deep);
-  --muted-foreground: var(--ink-soft);
+  --muted-foreground: var(--ink-faint);
   --accent: var(--pencil-wash);
   --accent-foreground: var(--pencil);
   --destructive: var(--pencil);
@@ -78,7 +72,7 @@
   --chart-3: var(--pencil);
   --chart-4: var(--amber);
   --chart-5: var(--green);
-  --sidebar: var(--film-deep);
+  --sidebar: var(--film-lift);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--ink);
   --sidebar-primary-foreground: var(--film);
@@ -86,29 +80,28 @@
   --sidebar-accent-foreground: var(--pencil);
   --sidebar-border: var(--rule);
   --sidebar-ring: var(--pencil);
-  --radius: 0px;
+  --radius: 8px; /* Crisp borders */
 
-  /* type scale: fixed rem steps, ratio ~1.2 (Operate) */
-  --fs-note: 0.6875rem;   /* 11 */
-  --fs-label: 0.75rem;    /* 12 */
-  --fs-body: 0.8125rem;   /* 13 */
-  --fs-lead: 0.9375rem;   /* 15 */
-  --fs-title: 1.125rem;   /* 18 */
-  --fs-sheet: 1.75rem;    /* 28 */
-  --fs-monument: 3.5rem;  /* 56 */
+  /* type scale */
+  --fs-note: 0.75rem;     /* 12px */
+  --fs-label: 0.8125rem;  /* 13px */
+  --fs-body: 0.9375rem;   /* 15px */
+  --fs-lead: 1.125rem;    /* 18px */
+  --fs-title: 1.5rem;     /* 24px */
+  --fs-sheet: 2rem;       /* 32px */
+  --fs-monument: 4rem;    /* 64px */
   --rail-w: 56px;
-  --notes-w: 380px;
+  --notes-w: 400px;
 }
 
-/* presentation mode: larger type, thinner marginalia. Only scale changes. */
 .presentation {
   --fs-note: 0.8125rem;
   --fs-label: 0.875rem;
-  --fs-body: 1rem;
-  --fs-lead: 1.125rem;
-  --fs-title: 1.375rem;
-  --fs-sheet: 2.25rem;
-  --fs-monument: 4.5rem;
+  --fs-body: 1.0625rem;
+  --fs-lead: 1.25rem;
+  --fs-title: 1.75rem;
+  --fs-sheet: 2.5rem;
+  --fs-monument: 5rem;
   --notes-w: 440px;
 }
 
@@ -164,22 +157,18 @@
   --color-amber-wash: var(--amber-wash);
   --color-green: var(--green);
   --color-violet: var(--violet);
-  --color-route-1: var(--route-1);
-  --color-route-2: var(--route-2);
-  --color-route-3: var(--route-3);
-  --color-route-4: var(--route-4);
-  --color-route-5: var(--route-5);
-  --color-route-6: var(--route-6);
 
-  --font-sans: var(--font-archivo), system-ui, sans-serif;
-  --font-condensed: var(--font-archivo-narrow), var(--font-archivo), sans-serif;
-  --font-stencil: var(--font-archivo-narrow), var(--font-archivo), sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), "Playfair Display", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "Cascadia Mono", monospace;
+  
+  --font-condensed: var(--font-geist-sans), system-ui, sans-serif;
+  --font-stencil: var(--font-geist-sans), system-ui, sans-serif;
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 @layer base {
@@ -189,19 +178,18 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     font-size: var(--fs-body);
-    line-height: 1.45;
-    font-feature-settings: "tnum" 1, "lnum" 1;
+    line-height: 1.6;
+    background-color: var(--film);
     overscroll-behavior: none;
   }
-  ::selection { background: var(--amber); color: var(--ink); }
-  :focus-visible { outline: 2px solid var(--pencil); outline-offset: 2px; border-radius: 2px; }
-  /* the parts we did not draw still carry the world */
+  ::selection { background: var(--amber); color: var(--amber-deep); }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: var(--film-deep); }
-  ::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 3px solid var(--film-deep); }
-  ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
-  * { scrollbar-color: var(--rule-strong) var(--film-deep); scrollbar-width: thin; }
-  input, textarea { caret-color: var(--amber-deep); }
+  ::-webkit-scrollbar-track { background: var(--film); }
+  ::-webkit-scrollbar-thumb { background: var(--rule); border: 3px solid var(--film); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+  * { scrollbar-color: var(--rule) var(--film); scrollbar-width: thin; }
+  input, textarea { caret-color: var(--ink); }
   a { text-underline-offset: 3px; text-decoration-thickness: 1px; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -209,94 +197,57 @@
 }
 
 @layer components {
-  /* Concourse terrazzo: fine aggregate speckle, not a drafting grid. Two offset dot fields at
-     coprime sizes so no repeat is legible at any zoom. */
+  /* Minimalist Background Gradients (Noise / Subtle depth) */
   .sheet-ground {
     background-color: var(--film);
-    background-image:
-      radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--rule-strong) 34%, transparent) 0.7px, transparent 0.85px),
-      radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--rule) 45%, transparent) 1px, transparent 1.15px);
-    background-size: 22px 22px, 47px 47px;
-    background-position: 0 0, 7px 11px;
+    background-image: radial-gradient(circle at top right, rgba(0,0,0,0.01) 0%, transparent 60%);
   }
   .sheet-plain { background-color: var(--film); }
-  .sheet-ground-fine {
-    background-image:
-      linear-gradient(to right, color-mix(in srgb, var(--rule) 55%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--rule) 55%, transparent) 1px, transparent 1px);
-    background-size: 8px 8px;
-  }
-  /* station signage caps */
-  .label { font-family: var(--font-condensed); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
-  .label-ink { color: var(--ink); }
-  .note { font-size: var(--fs-note); color: var(--ink-soft); }
-  .stencil { font-family: var(--font-condensed); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
-  /* the largest lettering on any lens: condensed board caps, the way a platform sign is set */
-  .sign {
-    font-family: var(--font-condensed);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.015em;
-    line-height: 0.92;
-  }
-  .figure { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1; }
-  .note-paper { background: var(--film-lift); box-shadow: 0 1px 0 var(--rule-strong), 0 8px 22px -14px rgba(20, 22, 19, 0.4); }
-  .pencil-line { box-shadow: inset 0 -2px 0 var(--pencil); }
 
-  /* The threads strike across the tray once, left to right. No fill-mode on purpose: if the
-     animation never runs the rect keeps its declared full width, so the threads are simply
-     already drawn rather than clipped away to nothing. */
-  @keyframes thread-strike { from { transform: translateX(-100%); } }
-  .thread-wipe { transform-box: fill-box; animation: thread-strike 1100ms cubic-bezier(0.16, 1, 0.3, 1); }
-  @media (prefers-reduced-motion: reduce) { .thread-wipe { animation: none; } }
+  .label { font-size: var(--fs-label); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+  .label-ink { color: var(--ink); font-weight: 600; }
+  .note { font-size: var(--fs-note); color: var(--ink-faint); }
+  .stencil { font-weight: 700; letter-spacing: -0.02em; }
+  .sign { font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; font-family: var(--font-serif); }
+  
+  .figure { font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums; }
+  
+  /* Ultra-flat card architecture */
+  .note-paper { 
+    background: var(--film-lift); 
+    border: 1px solid var(--rule); 
+    border-radius: var(--radius);
+    box-shadow: 0 4px 20px -10px rgba(0,0,0,0.03); 
+  }
+  
+  .pencil-line { box-shadow: inset 0 -1px 0 var(--ink); }
 
-  /* ---------------------------------------------------------------- the board
-     The one dark field on the page. Amber only burns here. */
   .board {
     background: var(--ink);
-    color: var(--amber);
-    font-family: var(--font-condensed);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--film);
   }
-  .board-dim { color: color-mix(in srgb, var(--amber) 78%, var(--ink)); }
-  .board-white { color: #eceee9; }
-  /* the seam across a split-flap character cell */
-  .flap-seam { position: relative; }
-  .flap-seam::after {
-    content: ""; position: absolute; left: 0; right: 0; top: 50%;
-    border-top: 1px solid rgba(0, 0, 0, 0.55); pointer-events: none;
-  }
-
-  /* Status pill: a name and a shape, never colour alone — and the word itself stays ink.
-     A role set in signal red reads as a verdict on the person; the hue belongs on the rule
-     around the word, where it grades the state without pronouncing on anybody. */
+  
+  /* Tag Badges in Muted Pastels */
   .status {
     display: inline-flex; align-items: center; gap: 0.375rem;
-    font-family: var(--font-condensed); font-size: var(--fs-note); font-weight: 600;
-    letter-spacing: 0.09em; text-transform: uppercase; padding: 0.05rem 0.3rem;
-    color: var(--ink);
-    border: 1px solid var(--status-tone, var(--rule-strong));
-    box-shadow: inset 2px 0 0 var(--status-tone, var(--rule-strong));
-    padding-left: 0.45rem;
+    font-size: var(--fs-note); font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase; 
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    background: var(--status-bg, var(--film-deep));
+    color: var(--status-tone, var(--ink));
+    border: 1px solid rgba(0,0,0,0.03);
   }
 
-  /* timetable: the service index and every dense register */
   .track { border-bottom: 1px solid var(--rule); }
   .track:hover { background: var(--film-lift); }
-  /* the platform edge: a run of tactile warning studs down a live rail */
-  .platform-edge {
-    background-image: radial-gradient(circle, var(--amber) 1.6px, transparent 1.8px);
-    background-size: 6px 6px; background-repeat: repeat-y; background-position: center top;
-  }
-  .hairline { border-color: var(--rule-strong); }
+  
+  .hairline { border-color: var(--rule); }
   .register-row { display: grid; grid-template-columns: 2.5rem 5.5rem 1fr 9rem 6rem; align-items: center; column-gap: 0.75rem; }
   .register-row-p { grid-template-columns: 3rem 6.5rem 1fr 10rem 7rem; }
 }
 
 @keyframes ripple-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-/* A status change is a physical event: the top half falls, the new card lands. */
 @keyframes flap-in {
   0%   { transform: rotateX(-88deg); opacity: 0; }
   55%  { transform: rotateX(12deg);  opacity: 1; }
@@ -308,11 +259,6 @@
 .ripple-in { animation: ripple-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 @layer utilities {
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }

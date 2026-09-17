@@ -7,7 +7,8 @@ export type EntityType =
 export type Extractor = "structured" | "checksum" | "rules" | "gliner" | "llm";
 
 export type Severity = "critical" | "high" | "medium" | "low";
-export type AlertStatus = "open" | "reviewing" | "dismissed" | "confirmed";
+export type AlertStatus = "new" | "reviewing" | "dismissed" | "confirmed" | "open";
+export type ReviewStatus = "pending" | "reviewed" | "escalated";
 
 export interface User { username: string; role: "admin" | "analyst" | "viewer"; full_name: string }
 
@@ -26,7 +27,9 @@ export interface NodeView {
   attrs: Record<string, unknown>; mentions: number;
   first_seen: string | null; last_seen: string | null;
   community: number | null; role: string | null; role_reasons: string[];
-  influence: number; priority: number; suspicion: number; suspicion_reasons: string[];
+  influence: number; priority: number;  suspicion: number;
+  suspicion_reasons: string[];
+  pending_review?: boolean;
   degree: number; pagerank: number;
   metrics: Partial<Record<"degree" | "weighted_degree" | "betweenness" | "pagerank" | "eigenvector" | "closeness" | "clustering" | "influence", number>>;
 }
@@ -67,8 +70,18 @@ export interface Community {
 export interface LinkPrediction { source: string; target: string; source_label: string; target_label: string; score: number; raw_score: number; jaccard: number; common_neighbors: string[]; explanation: string }
 
 export interface Alert {
-  id: string; kind: string; severity: Severity; title: string; description: string; score: number; status: AlertStatus;
-  evidence: Record<string, unknown>; created_at: string; entities: { id: string; label: string; type: EntityType }[];
+  id: string;
+  kind: string;
+  severity: Severity;
+  title: string;
+  description: string;
+  score: number;
+  status: AlertStatus;
+  review_status: ReviewStatus;
+  reviewed_by: string | null;
+  evidence: Record<string, unknown>;
+  created_at: string;
+  entities: { id: string; label: string; type: EntityType }[];
 }
 
 /**
@@ -111,8 +124,8 @@ export interface Dossier {
   entity: NodeView;
   relationships: Record<string, { direction: "in" | "out"; other: NodeView; count: number; weight: number; attrs: Record<string, unknown>; first_seen: string | null; last_seen: string | null; confidence: number }[]>;
   associates: { other: NodeView; weight: number; channels: Record<string, number>; calls: number; night_calls: number; amount: number; meetings: number; cases: number }[];
-  evidence: Evidence[];
-  alerts: { id: string; kind: string; severity: Severity; title: string; score: number; status: AlertStatus }[];
+  evidence: (Evidence & { document_title: string })[];
+  alerts: { id: string; kind: string; severity: Severity; title: string; score: number; status: AlertStatus; review_status: ReviewStatus }[];
   timeline: TimelineEvent[];
   activity: [string, number][];
   removal_impact: RemovalImpact | null;

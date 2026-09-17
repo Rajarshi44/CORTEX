@@ -177,8 +177,8 @@ export default function NotesDrawer() {
       <header className="flex items-start gap-2 border-b border-ink px-3 py-2">
         {e ? <Glyph shape={SHAPE[e.type]} size={18} stroke={e.type === "BANK_ACCOUNT" || e.type === "CRYPTO_WALLET" ? INK.blue : INK.ink} className="mt-1 shrink-0" /> : <span className="h-4 w-4" />}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[length:var(--fs-title)] font-semibold leading-tight text-ink">{e?.label ?? (isLoading ? "Loading note…" : "—")}</h2>
-          <p className="note truncate">{e ? [TYPE_LABEL[e.type], e.aliases?.length ? `@ ${e.aliases.join(", ")}` : null, e.role].filter(Boolean).join(" · ") : ""}</p>
+          <h2 className={cn("truncate text-[length:var(--fs-title)] font-semibold leading-tight text-ink", e?.pending_review ? "italic" : "")}>{e?.pending_review ? "Pending analyst review" : (e?.label ?? (isLoading ? "Loading note…" : "—"))}</h2>
+          <p className="note truncate">{e ? [TYPE_LABEL[e.type], (e.aliases?.length && !e.pending_review) ? `@ ${e.aliases.join(", ")}` : null, e.role].filter(Boolean).join(" · ") : ""}</p>
         </div>
         <button type="button" onClick={() => { setOpen(false); select(null); }} aria-label="Close notes" className="rounded-[2px] p-1 text-ink-soft hover:bg-film-deep hover:text-ink"><X className="h-4 w-4" /></button>
       </header>
@@ -249,6 +249,9 @@ export default function NotesDrawer() {
                       <span className="min-w-0 flex-1 text-[length:var(--fs-body)]">{ALERT_KIND_LABEL[a.kind] ?? a.kind}: {a.title}</span>
                       <select aria-label="Alert status" value={a.status} onChange={(ev) => patch.mutate({ id: a.id, status: ev.target.value as "open" })} className="label border border-rule-strong bg-film px-1 py-0.5">
                         {["open", "reviewing", "confirmed", "dismissed"].map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <select aria-label="Review status" value={a.review_status} onChange={(ev) => patch.mutate({ id: a.id, review_status: ev.target.value as "pending" })} className="label border border-rule-strong bg-film px-1 py-0.5">
+                        {["pending", "reviewed", "escalated"].map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </li>
                   ))}

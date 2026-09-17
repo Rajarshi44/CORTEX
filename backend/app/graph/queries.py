@@ -39,6 +39,7 @@ def node_view(G: nx.Graph, n: str, snapshot: dict | None = None) -> dict:
         "suspicion": snap.get("suspicion", {}).get(n, {}).get("score", 0.0),
         "suspicion_reasons": snap.get("suspicion", {}).get(n, {}).get("reasons", []),
         "degree": fm.get("degree", G.degree(n)), "pagerank": fm.get("pagerank", 0.0), "metrics": m,
+        "pending_review": n in snap.get("pending_reviews", []),
     }
 
 
@@ -175,7 +176,7 @@ def entity_dossier(db: Session, G: nx.Graph, D: nx.DiGraph, snapshot: dict, eid:
                  "extractor": ev.extractor, "document_id": ev.document_id, "document_title": ev.document.title,
                  **provenance.describe(ev.document)}
                 for ev in db.query(Evidence).filter(Evidence.entity_id == eid).order_by(Evidence.occurred_at).limit(60).all()]
-    alerts = [{"id": a.id, "kind": a.kind, "severity": a.severity, "title": a.title, "score": a.score, "status": a.status}
+    alerts = [{"id": a.id, "kind": a.kind, "severity": a.severity, "title": a.title, "score": a.score, "status": a.status, "review_status": a.review_status}
               for a in db.query(Alert).order_by(Alert.score.desc()).all() if eid in (a.entity_ids or [])]
     timeline = entity_timeline(db, eid)
     # activity histogram by week

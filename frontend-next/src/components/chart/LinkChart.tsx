@@ -304,7 +304,12 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
       if (wantLabel) {
         const fs = (isSel ? 12.5 : poi ? 11.5 : 10.5) * labelScale;
         ctx.font = `${isSel || poi ? 600 : 500} ${fs}px ${LABEL_FACE}`;
-        const label = n.label.length > 26 ? n.label.slice(0, 24) + "…" : n.label;
+        let rawLabel = n.label;
+        if (n.pending_review && !infra) {
+          rawLabel = "Pending analyst review";
+          ctx.font = `italic ${fs}px ${LABEL_FACE}`;
+        }
+        const label = rawLabel.length > 26 ? rawLabel.slice(0, 24) + "…" : rawLabel;
         const tw = ctx.measureText(label).width, th = fs * 1.2;
         const gap = r + 4;
         /**

@@ -110,6 +110,11 @@ export const ALERT_KIND_LABEL: Record<string, string> = {
   night_activity: "Night activity", international_contact: "International contact", behavioural_outlier: "Behavioural outlier",
   detector_error: "Detector error", wanted_corporate_ties: "Wanted person controls companies", offshore_officer_accused: "Offshore officer accused",
   debarred_shared_directors: "Debarred company, shared directors", mass_directorship: "Mass directorship",
+  GHOST_NODE: "Ghost node / hidden intermediary",
+  FIRST_TIME_OFFENDER_RISK: "First-time offender proximity risk",
+  SOURCE_OWNERSHIP_CONFLICT: "Source discrepancy: Ownership",
+  SOURCE_ATTRIBUTE_CONFLICT: "Source discrepancy: Attribute",
+  SOURCE_STATUS_CONFLICT: "Source discrepancy: Status (Ghost activity)",
 };
 
 /** Node radius on the chart: priority carries size; types without scores sit small. */

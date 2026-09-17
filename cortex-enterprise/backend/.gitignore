@@ -1,6 +1,0 @@
-.venv/
-data/cna.db*
-data/cache/
-data/icij/
-data/models/
-__pycache__/
