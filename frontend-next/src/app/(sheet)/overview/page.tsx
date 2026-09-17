@@ -17,7 +17,7 @@ import { largestComponents, projectionToChart } from "@/lib/projection";
 import { useSheet } from "@/lib/store";
 import SheetFooter from "@/components/sheet/SheetFooter";
 import { Glyph } from "@/components/sheet/KeyRail";
-import { SHAPE, SEVERITY_INK, ALERT_KIND_LABEL, TYPE_LABEL, TYPE_ORDER, routeInk } from "@/lib/notation";
+import { SHAPE, SEVERITY_INK, ALERT_KIND_LABEL, TYPE_LABEL, TYPE_ORDER, routeInk, maskLabel } from "@/lib/notation";
 import type { EntityType, KeyPlayer, NodeView } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -102,7 +102,7 @@ export default function Overview() {
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate font-semibold leading-tight">{p.label}</span>
+                      <span className="block truncate font-semibold leading-tight">{maskLabel(p.label, p.role)}</span>
                       <span className="flex min-w-0 items-baseline gap-1.5">
                         <span className={cn("label shrink-0 text-[0.625rem]", st.tone)} title={st.title}>{st.word}</span>
                         <span className="min-w-0 truncate note">{roleOnly(p.role)}</span>
@@ -153,7 +153,7 @@ export default function Overview() {
           {shown ? (
             <div className="px-3 py-2">
               <span aria-hidden="true" className="mb-2 block h-1 w-10" style={{ background: routeInk(shown.community) }} />
-              <h2 className="sign text-[length:var(--fs-title)] leading-tight">{shown.label}</h2>
+              <h2 className="sign text-[length:var(--fs-title)] leading-tight">{maskLabel(shown.label, "role" in shown ? shown.role : undefined, "party_role" in shown ? (shown as any).party_role : undefined)}</h2>
               <p className="mt-0.5 note">{TYPE_LABEL[shown.type]}{shownComm ? ` · ${shownComm.label}` : ""}</p>
               <dl className="mt-3 space-y-1">
                 {([["Priority", shown.priority], ["Position", shown.influence], ["Record", shown.suspicion]] as const).map(([k, v]) => (
@@ -223,7 +223,7 @@ export default function Overview() {
           <dl className="mt-4 flex flex-wrap items-stretch border border-rule-strong bg-film-lift">
             {([
               ["Sheet", sheet?.code ?? "—"],
-              ["Corpus", sheet?.kind === "real" ? "Public records" : sheet?.kind === "demo" ? "Synthetic demonstration" : sheet?.kind === "mixed" ? "Case corpus + public records" : "—"],
+              ["Corpus", sheet?.kind === "real" ? "Verified Case Corpus / Official records" : sheet?.kind === "demo" ? "Synthetic demonstration" : sheet?.kind === "mixed" ? "Case corpus + public records" : "—"],
               ["Record kinds", String(kinds || "—")],
               ["Ledger", ledger ? `${ledger.verify.status} · ${ledger.verify.entries} sealed` : "—"],
               ["Engine", ai?.compute.engine ?? "—"],
@@ -247,7 +247,7 @@ export default function Overview() {
                   <li key={p.id}>
                     <button type="button" onClick={() => select(p.id)} className="grid w-full grid-cols-[1.5rem_1fr_auto] items-center gap-2 py-2 text-left">
                       <span className="figure label text-ink-soft">{String(i + 1).padStart(2, "0")}</span>
-                      <span className="min-w-0"><span className="block truncate font-semibold">{p.label}</span><span className="block truncate note"><span className={st.tone}>{st.word}</span> · {roleOnly(p.role)}</span></span>
+                      <span className="min-w-0"><span className="block truncate font-semibold">{maskLabel(p.label, p.role)}</span><span className="block truncate note"><span className={st.tone}>{st.word}</span> · {roleOnly(p.role)}</span></span>
                       <span className="figure text-[length:var(--fs-lead)] font-semibold text-ink">{p.priority.toFixed(2)}</span>
                     </button>
                   </li>

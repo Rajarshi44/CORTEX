@@ -230,3 +230,23 @@ export function dateSpan(first?: string | null, last?: string | null): string {
   if (a && b) return a === b ? a : `${a} – ${b}`;
   return a ?? b ?? "";
 }
+
+export function isProtectedParty(role?: string | null, partyRole?: string | null, label?: string | null): boolean {
+  const r = (role || "").toLowerCase();
+  const pr = (partyRole || "").toLowerCase();
+  const l = (label || "").toLowerCase();
+  return r === "victim" || r === "complainant" || r === "witness" || r === "police" ||
+         pr === "victim" || pr === "complainant" || pr === "witness" || pr === "police" ||
+         l.includes("victim") || l.includes("complainant");
+}
+
+export function maskLabel(label: string, role?: string | null, partyRole?: string | null): string {
+  const r = (role || "").toLowerCase();
+  const pr = (partyRole || "").toLowerCase();
+  if (r === "victim" || pr === "victim" || (label && label.toLowerCase().includes("victim"))) return "[VICTIM]";
+  if (r === "complainant" || pr === "complainant") return "[COMPLAINANT]";
+  if (r === "witness" || pr === "witness") return "[WITNESS]";
+  if (r === "police" || pr === "police") return "[POLICE]";
+  return label;
+}
+

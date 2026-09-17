@@ -35,6 +35,7 @@ interface Turn {
   running: boolean;
   error?: string;
   stopped?: boolean;
+  searchWeb?: boolean;
 }
 
 const FALLBACK_EXAMPLES = [
@@ -47,6 +48,7 @@ const FALLBACK_EXAMPLES = [
 function Investigator() {
   const [initial, setInitial] = useQueryState("q", parseAsString);
   const [q, setQ] = useState("");
+  const [searchWeb, setSearchWeb] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [atBottom, setAtBottom] = useState(true);
   const setHighlights = useSheet((s) => s.setHighlights);
@@ -63,12 +65,12 @@ function Investigator() {
     setTurns((ts) => ts.map((t) => (t.id === id ? fn(t) : t)));
   }, []);
 
-  const ask = useCallback((question: string) => {
+  const ask = useCallback((question: string, isWeb: boolean = searchWeb) => {
     const s = question.trim();
     if (!s || abortRef.current) return;
     const id = nextId.current++;
     const history = turns.filter((t) => !t.error && t.text).slice(-4).map((t) => ({ question: t.q, answer: t.text }));
-    setTurns((ts) => [...ts, { id, q: s, text: "", calls: [], visuals: [], highlights: [], citations: [], running: true }]);
+    setTurns((ts) => [...ts, { id, q: s, text: "", calls: [], visuals: [], highlights: [], citations: [], running: true, searchWeb: isWeb }]);
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -110,7 +112,11 @@ function Investigator() {
       }
     };
 
-    streamAgent(s, history, onEvent, ctrl.signal)
+    const prompt = isWeb
+      ? `${s}\n\n[Open Web Search requested: Please use the web_search tool to search the internet for live reporting, articles, or external context relevant to this query, and cite findings.]`
+      : s;
+
+    streamAgent(prompt, history, onEvent, ctrl.signal)
       .catch((err: Error) => {
         if (ctrl.signal.aborted) patch(id, (t) => ({ ...t, running: false, stopped: true }));
         else patch(id, (t) => ({ ...t, running: false, error: err.message }));
@@ -119,7 +125,7 @@ function Investigator() {
         abortRef.current = null;
         patch(id, (t) => ({ ...t, running: false, calls: t.calls.map((c) => (c.done ? c : { ...c, done: true, ok: false, summary: "interrupted" })) }));
       });
-  }, [patch, setHighlights, turns]);
+  }, [patch, searchWeb, setHighlights, turns]);
 
   const stop = () => { abortRef.current?.abort(); abortRef.current = null; };
 
@@ -149,7 +155,7 @@ function Investigator() {
     const s = q.trim();
     if (!s) return;
     setQ("");
-    ask(s);
+    ask(s, searchWeb);
   };
 
   const examples = caps?.examples?.length ? caps.examples : FALLBACK_EXAMPLES;
@@ -173,6 +179,11 @@ function Investigator() {
                 <div className="flex items-baseline gap-2">
                   <span className="label shrink-0 text-ink-faint">Q · {String(i + 1).padStart(2, "0")}</span>
                   <h2 className="text-[length:var(--fs-lead)] font-semibold leading-snug">{t.q}</h2>
+                  {t.searchWeb && (
+                    <span className="label inline-flex items-center gap-1 rounded bg-blue-wash px-1.5 py-0.5 text-[length:var(--fs-note)] text-blue">
+                      <Globe className="h-3 w-3" aria-hidden="true" /> Open Web
+                    </span>
+                  )}
                 </div>
 
                 <div className="mt-2 border-l border-ink pl-3.5">
@@ -221,6 +232,20 @@ function Investigator() {
             aria-label="Question" disabled={!!noProvider}
             className="max-h-[132px] min-h-[38px] flex-1 resize-none self-center bg-transparent py-2 text-[length:var(--fs-lead)] outline-none placeholder:text-ink-faint disabled:opacity-50"
           />
+          <button
+            type="button"
+            onClick={() => setSearchWeb((v) => !v)}
+            title={searchWeb ? "Open Web Search enabled: Agent will search live internet" : "Click to enable Open Web Search"}
+            aria-pressed={searchWeb}
+            className={`label mb-1.5 flex shrink-0 items-center gap-1.5 rounded-[2px] border px-2.5 py-1.5 transition-colors ${
+              searchWeb
+                ? "border-blue bg-blue-wash text-blue font-semibold"
+                : "border-rule-strong text-ink-faint hover:border-ink hover:text-ink"
+            }`}
+          >
+            <Globe className={`h-3.5 w-3.5 ${searchWeb ? "text-blue stroke-[2.5]" : ""}`} aria-hidden="true" />
+            <span>Search Open Web</span>
+          </button>
           {running ? (
             <button type="button" onClick={stop} className="label mb-1.5 flex shrink-0 items-center gap-1 rounded-[2px] border border-ink px-2.5 py-1.5 hover:bg-film-deep">
               <Square className="h-3 w-3 fill-current" aria-hidden="true" /> Stop
@@ -363,12 +388,15 @@ function Footer({ turn, onSelect, onHighlight, onFollowUp }: {
           {webs.length > 0 && (
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               <span className="label shrink-0 text-ink-faint"><Globe className="mr-1 inline h-3 w-3" aria-hidden="true" />Open web</span>
-              {webs.slice(0, 4).map((c) => (
-                <a key={c.id} href={c.id} target="_blank" rel="noreferrer noopener" title={c.snippet}
-                   className="max-w-[220px] truncate text-[length:var(--fs-note)] text-blue underline decoration-dotted">
-                  {c.title || c.id}
-                </a>
-              ))}
+              {webs.map((c) => {
+                const href = c.id.startsWith("http") ? c.id : `https://${c.id}`;
+                return (
+                  <a key={c.id} href={href} target="_blank" rel="noreferrer noopener" title={c.snippet || c.title}
+                     className="inline-flex max-w-[260px] items-center gap-1 truncate text-[length:var(--fs-note)] text-blue underline decoration-dotted hover:text-pencil">
+                    <span className="truncate">{c.title || c.id}</span>
+                  </a>
+                );
+              })}
             </div>
           )}
         </div>

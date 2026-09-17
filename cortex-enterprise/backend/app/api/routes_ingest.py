@@ -128,43 +128,93 @@ def status_(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Dep
 @router.get("/documents")
 def documents(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)], source_type: str | None = None,
               q: str | None = None, entity_id: str | None = None, limit: int = 100):
-    query = db.query(Document)
-    if entity_id:
-        from ..db import Evidence
-        query = query.filter(Document.id.in_(
-            db.query(Evidence.document_id).filter(Evidence.entity_id == entity_id)
-        ))
-    if source_type:
-        query = query.filter(Document.source_type == source_type.upper())
-    if q:
-        query = query.filter(Document.title.ilike(f"%{q}%") | Document.content.ilike(f"%{q}%"))
-    rows = query.order_by(Document.occurred_at.desc().nullslast()).limit(limit).all()
-    return [{"id": d.id, "source_type": d.source_type, "title": d.title, "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None,
-             "records": d.record_count, "preview": (d.content or "")[:200]} for d in rows]
+     query = db.query(Document)
+     if entity_id:
+         from ..db import Evidence
+         query = query.filter(Document.id.in_(
+             db.query(Evidence.document_id).filter(Evidence.entity_id == entity_id)
+         ))
+     if source_type:
+         query = query.filter(Document.source_type == source_type.upper())
+     if q:
+         query = query.filter(Document.title.ilike(f"%{q}%") | Document.content.ilike(f"%{q}%"))
+     rows = query.order_by(Document.occurred_at.desc().nullslast()).limit(limit).all()
+     return [{"id": d.id, "source_type": d.source_type, "title": d.title, "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None,
+              "records": d.record_count, "preview": (d.content or "")[:200], "meta": d.meta,
+              "provenance": (d.meta or {}).get("provenance", "Real / Official Records")} for d in rows]
 
 
 @router.get("/documents/{doc_id}")
 def document(doc_id: str, db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)]):
+     d = db.get(Document, doc_id)
+     if not d:
+         raise HTTPException(404, "Document not found")
+     from ..db import Evidence
+
+     G = graph_cache.get(db)
+     evs = db.query(Evidence).filter(Evidence.document_id == doc_id).all()
+     ents = {}
+     for ev in evs:
+         if ev.entity_id and ev.entity_id in G:
+             ents[ev.entity_id] = {"id": ev.entity_id, "label": G.nodes[ev.entity_id]["label"], "type": G.nodes[ev.entity_id]["type"],
+                                   "snippet": ev.snippet, "confidence": ev.confidence, "extractor": ev.extractor}
+     bind_url = db.get_bind().url
+     db_name = bind_url.database.split("/")[-1] if bind_url.database else "cna"
+     db_type = "PostgreSQL" if "postgres" in bind_url.drivername else "SQLite" if "sqlite" in bind_url.drivername else bind_url.drivername
+
+     return {"id": d.id, "source_type": d.source_type, "title": d.title, "content": d.content, "meta": d.meta,
+             "provenance": (d.meta or {}).get("provenance", "Real / Official Records"),
+             "storage": {"database": f"{db_type} ({db_name})", "table": "documents"},
+             "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None, "records": d.record_count,
+             "entities": sorted(ents.values(), key=lambda e: e["type"])}
+
+
+class ProvenanceUpdateIn(BaseModel):
+    provenance: str = "Real / Official Records"
+    notes: str | None = None
+
+
+@router.put("/documents/{doc_id}/provenance", dependencies=[Depends(require_role("analyst"))])
+def update_document_provenance(doc_id: str, body: ProvenanceUpdateIn, user: Annotated[User, Depends(current_user)], db: Annotated[Session, Depends(get_session)]):
+    """Manually update/override a document's provenance status."""
+    from sqlalchemy.orm.attributes import flag_modified
+    from ..db import utcnow
+
     d = db.get(Document, doc_id)
     if not d:
-        raise HTTPException(404, "Document not found")
-    from ..db import Evidence
+        raise HTTPException(404, f"Document '{doc_id}' not found")
 
-    G = graph_cache.get(db)
-    evs = db.query(Evidence).filter(Evidence.document_id == doc_id).all()
-    ents = {}
-    for ev in evs:
-        if ev.entity_id and ev.entity_id in G:
-            ents[ev.entity_id] = {"id": ev.entity_id, "label": G.nodes[ev.entity_id]["label"], "type": G.nodes[ev.entity_id]["type"],
-                                  "snippet": ev.snippet, "confidence": ev.confidence, "extractor": ev.extractor}
-    bind_url = db.get_bind().url
-    db_name = bind_url.database.split("/")[-1] if bind_url.database else "cna"
-    db_type = "PostgreSQL" if "postgres" in bind_url.drivername else "SQLite" if "sqlite" in bind_url.drivername else bind_url.drivername
-    
-    return {"id": d.id, "source_type": d.source_type, "title": d.title, "content": d.content, "meta": d.meta,
-            "storage": {"database": f"{db_type} ({db_name})", "table": "documents"},
-            "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None, "records": d.record_count,
-            "entities": sorted(ents.values(), key=lambda e: e["type"])}
+    meta = dict(d.meta or {})
+    meta["provenance"] = body.provenance
+    if body.notes is not None:
+        meta["provenance_notes"] = body.notes
+    meta["tagged_by"] = user.username
+    meta["tagged_at"] = utcnow().isoformat()
+    if body.provenance.lower() == "unverified":
+        meta["unverified"] = True
+        meta.pop("synthetic", None)
+    elif "synthetic" in body.provenance.lower():
+        meta["synthetic"] = True
+        meta.pop("unverified", None)
+    else:
+        meta.pop("unverified", None)
+        meta.pop("synthetic", None)
+
+    d.meta = meta
+    flag_modified(d, "meta")
+    db.commit()
+    db.refresh(d)
+    analysis_service.invalidate()
+    audit(db, user, "tag_provenance", f"Doc {d.id} provenance updated to {body.provenance}")
+    return {
+        "ok": True,
+        "id": d.id,
+        "provenance": d.meta.get("provenance"),
+        "notes": doc_meta_notes if (doc_meta_notes := d.meta.get("provenance_notes")) else None,
+        "tagged_by": d.meta.get("tagged_by"),
+        "tagged_at": d.meta.get("tagged_at"),
+        "meta": d.meta,
+    }
 
 
 @router.delete("/reset", dependencies=[Depends(require_role("admin"))])

@@ -151,7 +151,7 @@ class WebConnector(Connector):
         out: list[dict] = []
         seen: set[str] = set()
         blocks = re.findall(
-            r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>(.*?)(?=<a[^>]+class="result__a"|</div>\s*</div>\s*</div>)',
+            r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>(.*?)(?=<a[^>]+class="result__a"|</div>\s*</div>\s*</div>|\Z)',
             page, re.DOTALL)
         for href, title, tail in blocks:
             url = unquote(parse_qs(urlparse(_html.unescape(href)).query).get("uddg", [_html.unescape(href)])[0])

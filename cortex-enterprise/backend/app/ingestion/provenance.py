@@ -104,12 +104,31 @@ def source_url(source_type: str, meta: dict[str, Any] | None = None, title: str 
     return SOURCE_HOMES.get(source_type)
 
 
+DEFAULT_PROVENANCE: str = "Real / Official Records"
+
+
+def source_provenance(source_type: str, meta: dict[str, Any] | None = None) -> str:
+    """The default or tagged provenance status of a document."""
+    meta = meta or {}
+    if "provenance" in meta and meta["provenance"]:
+        return str(meta["provenance"])
+    if meta.get("unverified"):
+        return "Unverified"
+    if meta.get("synthetic"):
+        return "Synthetic Override"
+    # All ingested data defaults to real system data / official records
+    return DEFAULT_PROVENANCE
+
+
 def describe(document: Any) -> dict[str, Any]:
     """The provenance block attached to evidence and document rows in the API."""
     meta = getattr(document, "meta", None) or {}
     st = getattr(document, "source_type", "") or ""
+    prov = source_provenance(st, meta)
     return {
         "source_name": source_name(st, meta),
         "source_url": source_url(st, meta, getattr(document, "title", "") or ""),
         "source_type": st,
+        "provenance": prov,
+        "is_verified": "Real" in prov or prov == DEFAULT_PROVENANCE,
     }

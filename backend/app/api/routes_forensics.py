@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import audit, current_user, require_role
+from ..auth import audit, current_user, optional_user, require_role
 from ..db import Document, User, get_session
 from ..graph import ledger
 from ..graph.case_linkage import CaseLinkageEngine, extract_features
@@ -53,6 +53,11 @@ def document_identifiers(doc_id: str, db: Annotated[Session, Depends(get_session
 
 
 # ----------------------------------------------------------------------------- ledger
+class VerifyProofIn(BaseModel):
+    leaf_hash: str
+    proof: dict
+
+
 @router.get("/ledger/verify")
 def ledger_verify(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)]):
     """Walk the evidence hash chain and report the exact break point if tampering occurred."""
@@ -60,8 +65,15 @@ def ledger_verify(db: Annotated[Session, Depends(get_session)], _: Annotated[Use
 
 
 @router.get("/ledger")
-def ledger_entries(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)],
-                   limit: int = 100, action: str | None = None, subject_id: str | None = None):
+@router.get("/ledger/entries")
+def ledger_entries(
+    db: Annotated[Session, Depends(get_session)],
+    _: Annotated[User, Depends(current_user)],
+    limit: int = 100,
+    action: str | None = None,
+    subject_id: str | None = None,
+):
+    """List ledger entries along with Merkle root, public key, and chain height."""
     q = db.query(ledger.LedgerEntry)
     if action:
         q = q.filter(ledger.LedgerEntry.action == action)
@@ -71,9 +83,103 @@ def ledger_entries(db: Annotated[Session, Depends(get_session)], _: Annotated[Us
     return {"entries": [e.as_dict() for e in rows], **ledger.stats(db)}
 
 
+@router.get("/ledger/proof/{index}")
+def ledger_proof(
+    index: int,
+    db: Annotated[Session, Depends(get_session)],
+    _: Annotated[User | None, Depends(optional_user)] = None,
+):
+    """Return cryptographic Merkle inclusion proof for a ledger entry."""
+    try:
+        return ledger.get_inclusion_proof(index, db)
+    except ValueError as err:
+        raise HTTPException(404, str(err))
+
+
+@router.post("/ledger/verify-proof")
+def ledger_verify_proof(
+    body: VerifyProofIn,
+    _: Annotated[User | None, Depends(optional_user)] = None,
+):
+    """Verify a Merkle tree inclusion proof against the calculated root."""
+    valid = ledger.verify_inclusion_proof(body.leaf_hash, body.proof)
+    return {
+        "valid": valid,
+        "leaf_hash": body.leaf_hash,
+        "root_hash": body.proof.get("root_hash"),
+    }
+
+
 @router.get("/ledger/anchor")
-def ledger_anchor(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)]):
-    return ledger.anchor(db)
+def ledger_anchor(
+    db: Annotated[Session, Depends(get_session)],
+    _: Annotated[User | None, Depends(optional_user)] = None,
+):
+    """Return persisted external anchor record with Ed25519 signature."""
+    return ledger.get_anchor(db)
+
+
+@router.get("/ledger/verify-brief")
+def verify_brief(
+    db: Annotated[Session, Depends(get_session)],
+    hash: str | None = None,
+    index: int | None = None,
+    _: Annotated[User | None, Depends(optional_user)] = None,
+):
+    """Verify brief hash and Ed25519 signature against evidence ledger."""
+    if not hash and index is None:
+        raise HTTPException(400, "Must provide 'hash' or 'index' query parameter")
+
+    entry: ledger.LedgerEntry | None = None
+    if index is not None:
+        entry = db.get(ledger.LedgerEntry, index)
+
+    if entry is None and hash:
+        entry = (
+            db.query(ledger.LedgerEntry)
+            .filter(
+                (ledger.LedgerEntry.payload_hash == hash)
+                | (ledger.LedgerEntry.entry_hash == hash)
+                | (ledger.LedgerEntry.detail.contains(hash))
+            )
+            .order_by(ledger.LedgerEntry.index.desc())
+            .first()
+        )
+
+    if entry is None:
+        return {
+            "status": "not_found",
+            "valid": False,
+            "hash": hash,
+            "index": index,
+            "reason": "No matching ledger entry found for this brief",
+        }
+
+    sig_valid = ledger.verify_signature(entry)
+    hash_match = True
+    if hash:
+        hash_match = (hash == entry.payload_hash) or (hash == entry.entry_hash) or (hash in entry.detail)
+
+    chain_status = ledger.verify(db)
+    is_valid = sig_valid and hash_match and chain_status.get("valid", True)
+
+    return {
+        "status": "verified" if is_valid else "invalid",
+        "valid": is_valid,
+        "index": entry.index,
+        "action": entry.action,
+        "subject_type": entry.subject_type,
+        "subject_id": entry.subject_id,
+        "payload_hash": entry.payload_hash,
+        "entry_hash": entry.entry_hash,
+        "signature": entry.signature or "",
+        "signature_valid": sig_valid,
+        "hash_match": hash_match,
+        "chain_intact": chain_status.get("valid", True),
+        "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+        "actor": entry.actor,
+        "detail": entry.detail,
+    }
 
 
 @router.get("/ledger/verify-document/{doc_id}")

@@ -4,17 +4,19 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from sqlalchemy.orm import Session
 
 from .api import (routes_agent, routes_ai, routes_auth, routes_forensics, routes_graph, routes_ingest,
                   routes_intel, routes_sources, routes_watch)
 from .api.deps import analysis_service
-from .auth import bootstrap_users
+from .auth import bootstrap_users, current_user
 from .config import settings
-from .db import Document, SessionLocal, init_db
+from .db import Document, SessionLocal, User, get_session, init_db
 from .ingestion.pipeline import load_demo_dataset
 from .ai.semantic import semantic_index
 from .ingestion.real_corpus import load_real_corpus
@@ -58,6 +60,11 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_or
 for r in (routes_auth.router, routes_ingest.router, routes_graph.router, routes_intel.router, routes_sources.router,
           routes_ai.router, routes_agent.router, routes_forensics.router, routes_watch.router):
     app.include_router(r)
+
+
+@app.put("/api/documents/{doc_id}/provenance", tags=["documents"])
+def proxy_update_document_provenance(doc_id: str, body: routes_ingest.ProvenanceUpdateIn, user: Annotated[User, Depends(current_user)], db: Annotated[Session, Depends(get_session)]):
+    return routes_ingest.update_document_provenance(doc_id, body, user, db)
 
 
 @app.get("/api/health", tags=["system"])

@@ -55,3 +55,48 @@ Your Immediate Steps:
 4. Keep progress.md regularly updated with timestamps.
 5. On 100% completion of all milestones and tests, message Sentinel (parent) to trigger the mandatory Victory Audit.
 
+## 2026-09-17T20:10:06Z
+
+You are the Project Orchestrator for the CORTEX SIH 2026 fix and polish project.
+
+Your working directory is: `c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\orchestrator`
+Project root: `c:\Users\NIRJHAR BARMA\Desktop\batcave`
+Integrity mode: benchmark
+
+The authoritative user request is documented in `c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\ORIGINAL_REQUEST.md` under section `## 2026-09-17T20:10:06Z`.
+
+## Objectives & Requirements:
+Fix and polish the CORTEX application for an SIH 2026 demo, focusing on victim protection, demo reliability, AI chat, data tagging, and a verifiable ledger.
+
+### R1. Victim Protection & Masking
+- Add party roles (victim, complainant, witness, police).
+- Exclude these roles from risk scoring, first-time-offender scoring, and community membership.
+- Mask victim identities by role throughout the UI (including the Brief and PDF).
+- Acceptance: No victim or complainant entities appear in the top risk rankings; victim names are replaced with masked roles (e.g., "[VICTIM]") in frontend.
+
+### R2. Investigator AI Chat
+- Replace canned answers with a functional chat using a real LLM API (e.g. Gemini or OpenAI). Check environment variables/configuration.
+- The chat must ask for case-specific details to answer accurately, fetch data from the database, and provide a functional option to search the internet (articles, news, etc.).
+- Acceptance: Queries for case facts retrieve actual database content using real LLM; web search fallback/option successfully retrieves live data from internet.
+
+### R3. Demo Loader Fixes
+- Correctly fix command structure edges (`REL_TYPE` mapping) in the demo loader (e.g., preventing `CONTROLS` from becoming `OWNS_ACCOUNT`).
+- Acceptance: Graph database shows correct edge types for command structures.
+
+### R4. Synthetic Data Tagging
+- Treat all ingested data as real system data by default, unless explicitly marked as unverified or from uploaded sources.
+- Add UI capabilities for manual tagging if automated tagging fails to correctly tag.
+- Acceptance: Ingested data displays "Real" or verified provenance unless manually overridden.
+
+### R5. Verifiable Evidence Ledger
+- Implement "blockchain" claims using real cryptography: Sign entries (Ed25519) and create Merkle batches with inclusion proofs using a standard Python crypto library.
+- Persist an external anchor, seal CSV bytes and PDF exports, and add a "verify this brief" QR code.
+- Acceptance: Ledger exports contain verifiable cryptographic signatures and a QR code.
+
+### R6. Demo Reliability & UI Polish
+- Fix map rendering (resolve MapLibre bug, center on Delhi, visible basemap tiles).
+- Add a small CDR file to ensure call detectors fire.
+- Remove "SYNTHETIC DEMO DATA" ribbon and fix provenance labels.
+- Acceptance: Map renders correctly centered on Delhi with visible basemap tiles; call detectors fire successfully using provided CDR file.
+
+*Note: Do NOT fix security flaws like the JWT secret, rate limiting, or raw PII storage, as requested by the user.*

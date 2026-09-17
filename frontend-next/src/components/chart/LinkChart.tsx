@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useCallback } from "react";
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 import type { EdgeView, NodeView } from "@/lib/types";
-import { DASH, INK, MONEY_RELS, SHAPE, lineStyleFor, nodeRadius, relLabel, routeInk, type Shape } from "@/lib/notation";
+import { DASH, INK, MONEY_RELS, SHAPE, lineStyleFor, nodeRadius, relLabel, routeInk, maskLabel, type Shape } from "@/lib/notation";
 import { useSheet } from "@/lib/store";
 
 export interface ChartProps {
@@ -304,7 +304,8 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
       if (wantLabel) {
         const fs = (isSel ? 12.5 : poi ? 11.5 : 10.5) * labelScale;
         ctx.font = `${isSel || poi ? 600 : 500} ${fs}px ${LABEL_FACE}`;
-        const label = n.label.length > 26 ? n.label.slice(0, 24) + "…" : n.label;
+        const masked = maskLabel(n.label, n.role, n.attrs?.party_role as string | undefined);
+        const label = masked.length > 26 ? masked.slice(0, 24) + "…" : masked;
         const tw = ctx.measureText(label).width, th = fs * 1.2;
         const gap = r + 4;
         /**
@@ -411,7 +412,9 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
 }
 
 export function edgeCaption(e: EdgeView, nodeById: Map<string, NodeView>): string {
-  const a = nodeById.get(e.source)?.label ?? "?", b = nodeById.get(e.target)?.label ?? "?";
+  const aNode = nodeById.get(e.source), bNode = nodeById.get(e.target);
+  const a = aNode ? maskLabel(aNode.label, aNode.role, aNode.attrs?.party_role as string | undefined) : "?";
+  const b = bNode ? maskLabel(bNode.label, bNode.role, bNode.attrs?.party_role as string | undefined) : "?";
   const style = lineStyleFor(e.attrs?.extractor as string | undefined, e.confidence);
   const grade = style === "solid" ? "structured record" : style === "dashed" ? "rule-extracted from text" : "model-inferred";
   const ch = e.attrs?.channels as Record<string, number> | undefined;

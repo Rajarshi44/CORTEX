@@ -1,12 +1,12 @@
-# BRIEFING — 2026-09-15T22:42:00Z
+# BRIEFING — 2026-09-18T02:40:00+05:30
 
 ## Mission
-Coordinate and monitor the end-to-end implementation and verification of the enterprise-grade Criminal Network Analysis (CNA) system (cortex-enterprise) according to user requirements R1-R5 and acceptance criteria.
+Coordinate and monitor the end-to-end fix and polish of CORTEX for SIH 2026 demo (victim protection, demo reliability, AI chat, data tagging, verifiable ledger) per ORIGINAL_REQUEST.md.
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\sentinel
-- Orchestrator: 351fbdd6-9feb-405c-b935-a37656abcd49
+- Orchestrator: 6b912dfe-a190-4754-bd68-6406c712353d
 - Victory Auditor: to be spawned on victory claim
 
 ## 🔒 Key Constraints
@@ -15,14 +15,15 @@ Coordinate and monitor the end-to-end implementation and verification of the ent
 - Must maintain ORIGINAL_REQUEST.md verbatim
 - Run crons for progress reporting (every 8m) and liveness checks (every 10m)
 - Do not write code or analyze technical problems
+- Do not fix security flaws like JWT secret, rate limiting, or raw PII storage per user instruction
 
 ## User Context
-- **Last user request**: Enterprise-grade Criminal Network Analysis system (cortex-enterprise) with ingestion, graph resolution, analytical engine, automated insights, and UI dashboard.
+- **Last user request**: Fix and polish CORTEX application for SIH 2026 demo (R1: Victim protection & masking, R2: Investigator AI chat with real LLM & web search, R3: Demo loader REL_TYPE fixes, R4: Synthetic data tagging & UI overrides, R5: Verifiable Ed25519/Merkle evidence ledger, R6: Demo reliability, map fix, CDR call detectors).
 - **Pending clarifications**: none
 - **Delivered results**: none
 
 ## Project Status
-- **Phase**: in progress (Milestone 1: Worker M1 actively migrating and scaffolding cortex-enterprise)
+- **Phase**: in progress (M1: Loader & CDR completed; M2: Victim Protection completed & verified; M4: Cryptographic ledger completed; Active: M3/M6 provenance tagging & MapLibre polish, M5 investigator AI chat & live search)
 
 ## Victory Audit Status
 - **Triggered**: no
@@ -33,6 +34,4 @@ Coordinate and monitor the end-to-end implementation and verification of the ent
 - c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\ORIGINAL_REQUEST.md — Authoritative record of user request
 - c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\sentinel\BRIEFING.md — Sentinel persistent working memory
 - c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\sentinel\handoff.md — Sentinel handoff report
-- c:\Users\NIRJHAR BARMA\Desktop\batcave\cortex-enterprise — Target system directory
 - c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\orchestrator\progress.md — Orchestrator progress tracker
-- c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\worker_m1\progress.md — Worker M1 scaffolding tracker

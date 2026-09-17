@@ -8,14 +8,61 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..auth import audit, current_user, require_role
-from ..db import SessionLocal, User, get_session
+from ..db import Document, SessionLocal, User, get_session, utcnow
 from ..sources import REGISTRY, cache, get_connector
 from .deps import analysis_service
 from .routes_ingest import _job_lock, hub
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
+
+
+class DocumentTagIn(BaseModel):
+    document_id: str
+    provenance: str = "Real / Official Records"
+    notes: str | None = None
+
+
+@router.post("/tag", dependencies=[Depends(require_role("analyst"))])
+def tag_document(body: DocumentTagIn, user: Annotated[User, Depends(current_user)], db: Annotated[Session, Depends(get_session)]):
+    """Override or update document provenance status manually."""
+    doc = db.get(Document, body.document_id)
+    if not doc:
+        raise HTTPException(404, f"Document '{body.document_id}' not found")
+
+    meta = dict(doc.meta or {})
+    meta["provenance"] = body.provenance
+    if body.notes is not None:
+        meta["provenance_notes"] = body.notes
+    meta["tagged_by"] = user.username
+    meta["tagged_at"] = utcnow().isoformat()
+    if body.provenance.lower() == "unverified":
+        meta["unverified"] = True
+        meta.pop("synthetic", None)
+    elif "synthetic" in body.provenance.lower():
+        meta["synthetic"] = True
+        meta.pop("unverified", None)
+    else:
+        meta.pop("unverified", None)
+        meta.pop("synthetic", None)
+
+    doc.meta = meta
+    flag_modified(doc, "meta")
+    db.commit()
+    db.refresh(doc)
+    analysis_service.invalidate()
+    audit(db, user, "tag_provenance", f"Doc {doc.id} provenance set to {body.provenance}")
+    return {
+        "ok": True,
+        "id": doc.id,
+        "provenance": doc.meta.get("provenance"),
+        "notes": doc.meta.get("provenance_notes"),
+        "tagged_by": doc.meta.get("tagged_by"),
+        "tagged_at": doc.meta.get("tagged_at"),
+        "meta": doc.meta,
+    }
 
 
 @router.get("")

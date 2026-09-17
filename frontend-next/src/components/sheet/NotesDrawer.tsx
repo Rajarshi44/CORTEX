@@ -14,7 +14,7 @@ import { useEntity, useAlertStatus, useAddNote, useUpdateNote, useDeleteNote } f
 import { Glyph, LineSample } from "./KeyRail";
 import {
   SHAPE, TYPE_LABEL, INK, SEVERITY_INK, ALERT_KIND_LABEL, lineStyleFor, relLabel, fmtInr,
-  attrRows, dateSpan,
+  attrRows, dateSpan, maskLabel,
 } from "@/lib/notation";
 import { sourceLabel, sourceHref } from "@/lib/provenance";
 import type { Dossier, DossierDocument, Evidence, Note } from "@/lib/types";
@@ -177,7 +177,7 @@ export default function NotesDrawer() {
       <header className="flex items-start gap-2 border-b border-ink px-3 py-2">
         {e ? <Glyph shape={SHAPE[e.type]} size={18} stroke={e.type === "BANK_ACCOUNT" || e.type === "CRYPTO_WALLET" ? INK.blue : INK.ink} className="mt-1 shrink-0" /> : <span className="h-4 w-4" />}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[length:var(--fs-title)] font-semibold leading-tight text-ink">{e?.label ?? (isLoading ? "Loading note…" : "—")}</h2>
+          <h2 className="truncate text-[length:var(--fs-title)] font-semibold leading-tight text-ink">{e ? maskLabel(e.label, e.role, (e.attributes as any)?.party_role) : (isLoading ? "Loading note…" : "—")}</h2>
           <p className="note truncate">{e ? [TYPE_LABEL[e.type], e.aliases?.length ? `@ ${e.aliases.join(", ")}` : null, e.role].filter(Boolean).join(" · ") : ""}</p>
         </div>
         <button type="button" onClick={() => { setOpen(false); select(null); }} aria-label="Close notes" className="rounded-[2px] p-1 text-ink-soft hover:bg-film-deep hover:text-ink"><X className="h-4 w-4" /></button>
@@ -259,13 +259,13 @@ export default function NotesDrawer() {
             {d.removal_impact && (
               <section className="mb-4 border border-pencil-soft bg-[var(--pencil-wash)] p-2">
                 <h3 className="label text-pencil">If removed</h3>
-                <p className="mt-1 text-[length:var(--fs-body)] text-ink">Cuts <span className="figure font-semibold">{Math.round((d.removal_impact.flow_share ?? 0) * 100)}%</span> of this community’s interaction volume; fragments it by <span className="figure font-semibold">{Math.round((d.removal_impact.community_fragmentation ?? 0) * 100)}%</span>{d.removal_impact.isolated_after?.length ? <>; isolates {d.removal_impact.isolated_after.map((x) => x.label).join(", ")}</> : null}.</p>
+                <p className="mt-1 text-[length:var(--fs-body)] text-ink">Cuts <span className="figure font-semibold">{Math.round((d.removal_impact.flow_share ?? 0) * 100)}%</span> of this community’s interaction volume; fragments it by <span className="figure font-semibold">{Math.round((d.removal_impact.community_fragmentation ?? 0) * 100)}%</span>{d.removal_impact.isolated_after?.length ? <>; isolates {d.removal_impact.isolated_after.map((x) => maskLabel(x.label)).join(", ")}</> : null}.</p>
               </section>
             )}
 
             <div className="flex flex-wrap gap-2">
               <Link href={`/chart?focus=${e.id}&depth=2`} className="label rounded-[2px] border border-ink px-2 py-1 hover:bg-ink hover:text-film">Redraw around this</Link>
-              <button type="button" onClick={() => setHighlights([e.id, ...assoc.slice(0, 8).map((a) => a.other.id)], `${e.label} and their eight strongest associates are emphasised.`)} className="label rounded-[2px] border border-rule-strong px-2 py-1 hover:border-ink">Emphasise associates</button>
+              <button type="button" onClick={() => setHighlights([e.id, ...assoc.slice(0, 8).map((a) => a.other.id)], `${maskLabel(e.label, e.role, (e.attributes as any)?.party_role)} and their eight strongest associates are emphasised.`)} className="label rounded-[2px] border border-rule-strong px-2 py-1 hover:border-ink">Emphasise associates</button>
               <button type="button" onClick={() => setRoute(null)} className="label rounded-[2px] border border-rule-strong px-2 py-1 hover:border-ink">Clear route</button>
             </div>
           </div>
@@ -281,13 +281,13 @@ export default function NotesDrawer() {
                 <ul>
                   {rows.map((r, i) => {
                     const span = dateSpan(r.first_seen, r.last_seen);
-                    const subject = r.direction === "out" ? e.label : r.other.label;
-                    const object = r.direction === "out" ? r.other.label : e.label;
+                    const subject = r.direction === "out" ? maskLabel(e.label, e.role, (e.attributes as any)?.party_role) : maskLabel(r.other.label, (r.other as any).role, (r.other.attrs as any)?.party_role);
+                    const object = r.direction === "out" ? maskLabel(r.other.label, (r.other as any).role, (r.other.attrs as any)?.party_role) : maskLabel(e.label, e.role, (e.attributes as any)?.party_role);
                     return (
                       <li key={`${r.other.id}-${i}`} className="border-b border-rule py-1.5 last:border-b-0">
                         <button type="button" onClick={() => select(r.other.id)} className="flex w-full items-center gap-2 text-left hover:text-pencil">
                           <Glyph shape={SHAPE[r.other.type]} size={13} stroke={r.other.type === "BANK_ACCOUNT" || r.other.type === "CRYPTO_WALLET" ? INK.blue : INK.ink} />
-                          <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)]">{r.other.label}</span>
+                          <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)]">{maskLabel(r.other.label, (r.other as any).role, (r.other.attrs as any)?.party_role)}</span>
                           {r.count > 1 && <span className="figure note shrink-0">{r.count}×</span>}
                         </button>
                         <p className="note pl-7">
@@ -334,7 +334,7 @@ export default function NotesDrawer() {
                 <button type="button" onClick={() => select(a.other.id)} className="flex w-full items-center gap-2 text-left hover:text-pencil">
                   <span className="figure label text-ink-faint">{String(i + 1).padStart(2, "0")}</span>
                   <Glyph shape={SHAPE[a.other.type]} size={13} />
-                  <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)]">{a.other.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)]">{maskLabel(a.other.label, (a.other as any).role, (a.other.attrs as any)?.party_role)}</span>
                   <span className="figure note">{a.weight.toFixed(1)}</span>
                 </button>
                 <p className="note pl-7">{Object.entries(a.channels).map(([k, v]) => `${k} ${v}`).join(" · ")}{a.amount ? ` · ${fmtInr(a.amount)}` : ""}{a.night_calls ? ` · ${a.night_calls} night` : ""}</p>

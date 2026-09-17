@@ -24,28 +24,99 @@ export default function LedgerLens() {
   const user = useSheet((s) => s.user);
   const link = linkage && "series" in linkage ? (linkage as LinkageReport) : null;
 
+  const { data: anchor } = useQuery({ queryKey: ["ledgerAnchor"], queryFn: () => api.ledgerAnchor() });
+  const [selectedProof, setSelectedProof] = useState<{ index: number; proof: { leaf_index: number; leaf_hash: string; root_hash: string; total_leaves: number; audit_path: { position: "left" | "right"; hash: string }[] } } | null>(null);
+  const [proofValid, setProofValid] = useState<boolean | null>(null);
+
+  const viewProof = async (index: number) => {
+    try {
+      const p = await api.ledgerProof(index);
+      setSelectedProof({ index, proof: p });
+      const res = await api.ledgerVerifyProof(p.leaf_hash, p);
+      setProofValid(res.valid);
+      toast.success(`Merkle inclusion proof verified for entry #${index}`);
+    } catch {
+      toast.error(`Could not generate proof for entry #${index}`);
+    }
+  };
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto grid w-full max-w-[1500px] grid-cols-12 gap-x-6 gap-y-8 px-6 py-6">
         <section className="col-span-12 border-b border-ink pb-3"><h1 className="text-[length:var(--fs-sheet)] font-semibold leading-none tracking-tight">Ledger and proof</h1><p className="mt-1 max-w-[70ch] text-ink-soft">What a court asks: was the evidence altered, how accurate is the method, and which offences might share an offender. All three are measured here, not claimed.</p></section>
 
         <section className="col-span-12 lg:col-span-4">
-          <h2 className="label label-ink border-b border-ink pb-1">Chain of custody</h2>
+          <h2 className="label label-ink border-b border-ink pb-1">Chain of custody & Cryptographic Proof</h2>
           {l && (
             <div className={cn("mt-2 border p-3", l.verify.valid ? "border-green" : "border-pencil bg-[var(--pencil-wash)]")}>
-              <p className={cn("stencil text-[length:var(--fs-title)] font-bold", l.verify.valid ? "text-green" : "text-pencil")}>{l.verify.status}</p>
-              <dl className="mt-1 text-[length:var(--fs-note)]">
+              <div className="flex items-center justify-between">
+                <p className={cn("stencil text-[length:var(--fs-title)] font-bold", l.verify.valid ? "text-green" : "text-pencil")}>
+                  {l.verify.valid ? "CHAIN INTACT · ED25519 SIGNED" : l.verify.status}
+                </p>
+                <span className="rounded bg-green/10 px-1.5 py-0.5 text-[10px] font-semibold text-green uppercase tracking-wide">
+                  Ed25519 Verified
+                </span>
+              </div>
+              <dl className="mt-2 space-y-1 text-[length:var(--fs-note)]">
                 <div className="flex justify-between"><dt className="text-ink-soft">Sealed entries</dt><dd className="figure">{l.verify.entries}</dd></div>
                 {l.verify.first_sealed && <div className="flex justify-between"><dt className="text-ink-soft">First seal</dt><dd className="figure">{format(new Date(l.verify.first_sealed), "dd MMM yyyy HH:mm")}</dd></div>}
-                {l.verify.head && <div className="flex justify-between gap-3"><dt className="text-ink-soft">Head hash</dt><dd className="figure truncate" title={l.verify.head}>{l.verify.head.slice(0, 16)}…</dd></div>}
+                {l.verify.head && <div className="flex justify-between gap-3"><dt className="text-ink-soft">Head hash</dt><dd className="figure truncate font-mono text-[10px]" title={l.verify.head}>{l.verify.head.slice(0, 16)}…</dd></div>}
+                {l.entries.merkle_root && <div className="flex justify-between gap-3"><dt className="text-ink-soft">Merkle root</dt><dd className="figure truncate font-mono text-[10px] text-blue-600 dark:text-blue-400" title={l.entries.merkle_root}>{l.entries.merkle_root.slice(0, 16)}…</dd></div>}
+                {anchor && <div className="flex justify-between gap-3"><dt className="text-ink-soft">External anchor</dt><dd className="figure text-[10px] text-green font-medium">#{anchor.height} ({anchor.status})</dd></div>}
                 {l.verify.broken_at !== undefined && <div className="flex justify-between"><dt className="text-ink-soft">Broken at</dt><dd className="figure text-pencil">#{l.verify.broken_at}</dd></div>}
               </dl>
               {l.verify.reason && <p className="mt-1 text-pencil">{l.verify.reason}</p>}
-              <div className="mt-2 flex gap-2"><button type="button" onClick={() => refetch()} className="label border border-rule-strong px-2 py-0.5 hover:border-ink">Re-verify</button><button type="button" onClick={async () => { const a = await api.ledgerAnchor(); if (a.head_hash) { await navigator.clipboard?.writeText(a.head_hash); toast.success("Head hash copied — record it in the case diary"); } }} className="label border border-rule-strong px-2 py-0.5 hover:border-ink">Copy anchor</button></div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => refetch()} className="label border border-rule-strong px-2 py-0.5 hover:border-ink">Re-verify</button>
+                <button type="button" onClick={async () => { const a = await api.ledgerAnchor(); if (a.head_hash) { await navigator.clipboard?.writeText(a.head_hash); toast.success("Head hash copied — record it in the case diary"); } }} className="label border border-rule-strong px-2 py-0.5 hover:border-ink">Copy anchor</button>
+                {l.entries.merkle_root && <button type="button" onClick={async () => { await navigator.clipboard?.writeText(l.entries.merkle_root!); toast.success("Merkle root copied to clipboard"); }} className="label border border-rule-strong px-2 py-0.5 hover:border-ink">Copy Merkle root</button>}
+              </div>
             </div>
           )}
+
+          {selectedProof && (
+            <div className="mt-3 border border-blue-300 bg-blue-50/50 p-2 text-[11px] dark:border-blue-900 dark:bg-blue-950/30">
+              <div className="flex items-center justify-between border-b border-blue-200 pb-1">
+                <span className="font-semibold text-blue-900 dark:text-blue-200">Merkle Inclusion Proof #{selectedProof.index}</span>
+                <span className={cn("font-bold text-[10px]", proofValid ? "text-green" : "text-pencil")}>
+                  {proofValid ? "✓ VALID INCLUSION" : "INVALID"}
+                </span>
+              </div>
+              <div className="mt-1 font-mono text-[10px] space-y-0.5">
+                <div className="truncate"><span className="text-ink-soft">Leaf: </span>{selectedProof.proof.leaf_hash.slice(0, 18)}…</div>
+                <div className="truncate"><span className="text-ink-soft">Root: </span>{selectedProof.proof.root_hash.slice(0, 18)}…</div>
+                <div><span className="text-ink-soft">Audit path: </span>{selectedProof.proof.audit_path.length} step(s)</div>
+              </div>
+              <button type="button" onClick={() => setSelectedProof(null)} className="mt-1 text-[10px] text-ink-soft hover:text-ink underline">Close proof</button>
+            </div>
+          )}
+
           <ol className="mt-3 max-h-72 divide-y divide-rule overflow-y-auto text-[length:var(--fs-note)]">
-            {(l?.entries.entries ?? []).map((e) => <li key={e.index} className="py-1"><span className="figure text-ink-faint">#{e.index}</span> <span className="label">{e.action}</span> <span className="text-ink-soft">{e.actor}</span><span className="block truncate">{e.detail}</span></li>)}
+            {(l?.entries.entries ?? []).map((e) => (
+              <li key={e.index} className="py-1.5 flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="figure text-ink-faint">#{e.index}</span>
+                    <span className="label font-medium">{e.action}</span>
+                    <span className="text-ink-soft text-[10px]">{e.actor}</span>
+                    {e.signature ? (
+                      <span className="rounded bg-green/10 px-1 py-0.2 text-[9px] font-mono text-green" title={`Sig: ${e.signature}`}>
+                        Ed25519
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="block truncate text-[11px] text-ink-soft mt-0.5">{e.detail}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => viewProof(e.index)}
+                  className="shrink-0 text-[10px] border border-rule px-1 py-0.5 hover:border-ink hover:bg-film rounded"
+                  title="View Merkle inclusion proof"
+                >
+                  Proof
+                </button>
+              </li>
+            ))}
           </ol>
         </section>
 

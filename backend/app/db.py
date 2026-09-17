@@ -257,6 +257,7 @@ def init_db() -> None:
     from .graph import ledger  # noqa: F401  (registers the evidence_ledger table on Base)
 
     Base.metadata.create_all(engine)
+    ledger.ensure_ledger_schema(engine)
 
 
 def get_session() -> Iterator[Session]:

@@ -7,7 +7,7 @@ import { useAlerts, useAlertStatus, useDetectors } from "@/lib/queries";
 import { useSheet } from "@/lib/store";
 import SheetFooter from "@/components/sheet/SheetFooter";
 import StandingWatches from "@/components/sheet/StandingWatches";
-import { ALERT_KIND_LABEL, SEVERITY_INK } from "@/lib/notation";
+import { ALERT_KIND_LABEL, SEVERITY_INK, maskLabel } from "@/lib/notation";
 import type { Alert, AlertStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -31,7 +31,7 @@ function Evidence({ a }: { a: Alert }) {
     </div>
   );
 }
-function EntityChip({ id, label }: { id: string; label: string }) { const select = useSheet((s) => s.select); return <button type="button" onClick={() => select(id)} className="border border-rule-strong px-1.5 py-0.5 text-[length:var(--fs-note)] hover:border-ink">{label}</button>; }
+function EntityChip({ id, label }: { id: string; label: string }) { const select = useSheet((s) => s.select); return <button type="button" onClick={() => select(id)} className="border border-rule-strong px-1.5 py-0.5 text-[length:var(--fs-note)] hover:border-ink">{maskLabel(label)}</button>; }
 
 function Register() {
   const [status, setStatus] = useState<string>("open");
@@ -65,7 +65,7 @@ function Register() {
                 <div className={cn("register-row py-1.5", presentation && "register-row-p", open && "bg-film-lift")}>
                   <span className="figure text-ink-faint">{String(i + 1).padStart(3, "0")}</span>
                   <span className="flex items-center gap-1.5 label" style={{ color: SEVERITY_INK[a.severity] }}><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: SEVERITY_INK[a.severity] }} />{a.severity}</span>
-                  <button type="button" onClick={() => setOpenId(open ? null : a.id)} aria-expanded={open} className="min-w-0 truncate text-left font-medium hover:text-pencil">{a.title}</button>
+                  <button type="button" onClick={() => setOpenId(open ? null : a.id)} aria-expanded={open} className="min-w-0 truncate text-left font-medium hover:text-pencil">{maskLabel(a.title)}</button>
                   <span className="label truncate text-ink-soft">{ALERT_KIND_LABEL[a.kind] ?? a.kind}</span>
                   <span className="figure text-right">{a.score.toFixed(2)}</span>
                 </div>
@@ -123,5 +123,5 @@ function Register() {
     </div>
   );
 }
-function MarkdownInline({ text }: { text: string }) { return <>{text.split(/(\*\*[^*]+\*\*)/g).map((p, i) => p.startsWith("**") ? <strong key={i}>{p.slice(2, -2)}</strong> : <span key={i}>{p}</span>)}</>; }
+function MarkdownInline({ text }: { text: string }) { const masked = maskLabel(text); return <>{masked.split(/(\*\*[^*]+\*\*)/g).map((p, i) => p.startsWith("**") ? <strong key={i}>{p.slice(2, -2)}</strong> : <span key={i}>{p}</span>)}</>; }
 export default function Page() { return <Suspense><Register /></Suspense>; }

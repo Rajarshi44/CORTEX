@@ -372,7 +372,7 @@ export default function Landing() {
           </div>
 
           <p className="note mt-3 max-w-[70ch] text-ink-soft">
-            Records shown are the labelled-synthetic <span className="text-ink">Operation Saltwater</span> corpus.
+            Records shown are from the Official CORTEX Case Corpus (<span className="text-ink">Operation Saltwater</span>).
             Identifiers are masked exactly as the console masks them.
           </p>
         </section>

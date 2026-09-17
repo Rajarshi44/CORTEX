@@ -57,6 +57,20 @@ export const SOURCE_GIST: Record<string, string> = {
   REPORT: "Analyst-written notes and reports",
 };
 
+/** Default verified investigation provenance. */
+export const DEFAULT_PROVENANCE = "Real / Official Records";
+
+/**
+ * Returns the provenance label for a document, defaulting to verified investigation provenance.
+ */
+export function sourceProvenance(sourceType?: string | null, meta?: Record<string, unknown> | null, given?: string | null): string {
+  if (given) return given;
+  if (meta?.provenance && typeof meta.provenance === "string") return meta.provenance;
+  if (meta?.unverified) return "Unverified";
+  if (meta?.synthetic) return "Synthetic Override";
+  return DEFAULT_PROVENANCE;
+}
+
 /** Name of a source, preferring whatever the API already resolved. */
 export function sourceLabel(sourceType?: string | null, given?: string | null): string {
   if (given) return given;

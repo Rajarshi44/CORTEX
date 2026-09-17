@@ -310,7 +310,13 @@ class FirstTimeOffenderEngine:
             if node.get("type") != "PERSON":
                 continue
 
+            from .quality import is_protected_party
+            if is_protected_party(node.get("type", ""), node.get("label", ""), node.get("attrs") or {}):
+                continue
+
             s = susp.get(n, {})
+            if s.get("protected"):
+                continue
             # Only flag "clean" individuals
             if s.get("score", 0) >= 0.2 or s.get("accused", 0) > 0 or s.get("watchlist"):
                 continue

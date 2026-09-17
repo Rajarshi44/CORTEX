@@ -18,8 +18,8 @@ import { useSheet } from "@/lib/store";
 import SheetFooter from "@/components/sheet/SheetFooter";
 import { Glyph } from "@/components/sheet/KeyRail";
 import { SHAPE } from "@/lib/notation";
-import { CONNECTOR_GROUPS, CONNECTOR_GIST, connectorHref, sourceLabel, sourceHref, sourceGist, metaHref } from "@/lib/provenance";
-import type { EntityType, SourceInfo } from "@/lib/types";
+import { CONNECTOR_GROUPS, CONNECTOR_GIST, connectorHref, sourceLabel, sourceHref, sourceGist, metaHref, sourceProvenance } from "@/lib/provenance";
+import type { DocumentDetail, EntityType, SourceInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
@@ -250,14 +250,21 @@ function Sources() {
             <div className="lg:col-span-5">
               <p className="note mb-1">{(docs ?? []).length} shown{docType ? ` · ${docType}` : ""}{entityId ? " · filtered to the selected entity" : ""}</p>
               <ol className="max-h-[60vh] divide-y divide-rule overflow-y-auto border-t border-rule">
-                {(docs ?? []).map((dd) => (
-                  <li key={dd.id}>
-                    <button type="button" onClick={() => setDocId(dd.id)} className={cn("block w-full py-2 pr-2 text-left hover:text-pencil", docId === dd.id && "text-pencil")}>
-                      <span className="flex items-baseline gap-2"><span className="label shrink-0 text-ink-faint">{dd.source_type}</span><span className="min-w-0 flex-1 text-[length:var(--fs-body)]">{dd.title}</span>{dd.occurred_at && <span className="figure note shrink-0">{format(new Date(dd.occurred_at), "dd MMM yy")}</span>}</span>
-                      <span className="note block">{sourceLabel(dd.source_type)} · {dd.records} record{dd.records === 1 ? "" : "s"}</span>
-                    </button>
-                  </li>
-                ))}
+                {(docs ?? []).map((dd) => {
+                  const prov = sourceProvenance(dd.source_type, dd.meta, dd.provenance);
+                  const isReal = prov.includes("Real");
+                  return (
+                    <li key={dd.id}>
+                      <button type="button" onClick={() => setDocId(dd.id)} className={cn("block w-full py-2 pr-2 text-left hover:text-pencil", docId === dd.id && "text-pencil")}>
+                        <span className="flex items-baseline gap-2"><span className="label shrink-0 text-ink-faint">{dd.source_type}</span><span className="min-w-0 flex-1 text-[length:var(--fs-body)] truncate">{dd.title}</span>{dd.occurred_at && <span className="figure note shrink-0">{format(new Date(dd.occurred_at), "dd MMM yy")}</span>}</span>
+                        <span className="mt-0.5 flex items-baseline justify-between gap-2">
+                          <span className="note block truncate">{sourceLabel(dd.source_type)} · {dd.records} record{dd.records === 1 ? "" : "s"}</span>
+                          <span className={cn("label text-[10px] shrink-0 border px-1 py-0.2", isReal ? "border-green/40 text-green" : "border-pencil/40 text-pencil")}>{isReal ? "Real" : prov}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
                 {docs && docs.length === 0 && <li className="note py-3">No document matches this filter.</li>}
               </ol>
             </div>
@@ -282,6 +289,7 @@ function Sources() {
                   )}
                   {doc.content && <pre className="mt-4 max-h-72 overflow-y-auto whitespace-pre-wrap border-l border-rule-strong pl-3 font-sans text-[length:var(--fs-body)] leading-relaxed">{doc.content.slice(0, 4000)}</pre>}
                   <VerifyDoc id={doc.id} />
+                  <DocProvenanceTag doc={doc} onUpdated={invalidate} />
                   {doc.meta && Object.keys(doc.meta).length > 0 && (
                     <div className="mt-4 border-t border-rule-strong pt-3">
                       <h4 className="label text-ink-faint mb-2">Source metadata</h4>
@@ -331,4 +339,126 @@ function VerifyDoc({ id }: { id: string }) {
   const [r, setR] = useState<{ status: string; conclusion?: string; reason?: string } | null>(null);
   return <div className="mt-4 flex items-center gap-2 border-t border-rule pt-3 text-[length:var(--fs-note)]"><button type="button" onClick={async () => setR(await api.verifyDocument(id))} className="label border border-rule-strong px-2 py-0.5 hover:border-ink">Verify against ledger</button>{r && <span className={cn("figure", r.status === "match" ? "text-green" : r.status === "mismatch" ? "text-pencil" : "text-ink-soft")}>{r.conclusion ?? r.reason ?? r.status}</span>}</div>;
 }
+
+function DocProvenanceTag({ doc, onUpdated }: { doc: DocumentDetail; onUpdated: () => void }) {
+  const currentProvenance = sourceProvenance(doc.source_type, doc.meta, doc.provenance);
+  const [selected, setSelected] = useState(currentProvenance);
+  const [notes, setNotes] = useState(String(doc.meta?.provenance_notes ?? ""));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setSelected(sourceProvenance(doc.source_type, doc.meta, doc.provenance));
+    setNotes(String(doc.meta?.provenance_notes ?? ""));
+  }, [doc]);
+
+  const handleUpdate = async (newProv: string) => {
+    setSaving(true);
+    setSelected(newProv);
+    try {
+      await api.tagDocument(doc.id, newProv, notes.trim() || undefined);
+      toast.success(`Provenance updated: ${newProv}`);
+      onUpdated();
+    } catch (err) {
+      toast.error((err as Error).message);
+      setSelected(currentProvenance);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isReal = selected.includes("Real");
+  const isUnverified = selected.toLowerCase().includes("unverified");
+  const isSynthetic = selected.toLowerCase().includes("synthetic");
+
+  return (
+    <div className="mt-4 border-t border-rule-strong pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h4 className="label text-ink-faint">Document Provenance Tag</h4>
+          <p className="note mt-0.5">All ingested case corpus data defaults to real evidence. Analysts may manually override status.</p>
+        </div>
+        <span
+          className={cn(
+            "label px-2 py-0.5 border font-semibold",
+            isReal
+              ? "border-green text-green bg-green/10"
+              : isUnverified
+              ? "border-pencil text-pencil bg-pencil/10"
+              : "border-ink-soft text-ink-soft bg-film-deep"
+          )}
+        >
+          {selected}
+        </span>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <span className="label text-ink-faint">Manual Override:</span>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => handleUpdate("Real / Official Records")}
+          className={cn(
+            "label border px-2 py-1 transition-colors cursor-pointer",
+            isReal
+              ? "border-ink bg-ink text-film font-bold"
+              : "border-rule-strong hover:border-ink hover:bg-film-deep"
+          )}
+        >
+          ✓ Real / Official
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => handleUpdate("Unverified")}
+          className={cn(
+            "label border px-2 py-1 transition-colors cursor-pointer",
+            isUnverified
+              ? "border-pencil bg-pencil text-film font-bold"
+              : "border-rule-strong hover:border-pencil text-pencil hover:bg-film-deep"
+          )}
+        >
+          ⚠ Unverified
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => handleUpdate("Synthetic Override")}
+          className={cn(
+            "label border px-2 py-1 transition-colors cursor-pointer",
+            isSynthetic
+              ? "border-ink bg-ink text-film font-bold"
+              : "border-rule-strong hover:border-ink hover:bg-film-deep"
+          )}
+        >
+          ⚙ Synthetic Override
+        </button>
+      </div>
+
+      <div className="mt-2 flex gap-2">
+        <input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Analyst verification notes (e.g. verified with station diary / certified copy)"
+          className="flex-1 border border-rule-strong bg-film px-2 py-1 text-[length:var(--fs-note)] text-ink"
+        />
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => handleUpdate(selected)}
+          className="label border border-rule-strong px-2 py-1 hover:border-ink hover:bg-film-deep cursor-pointer"
+        >
+          {saving ? "Saving…" : "Save Note"}
+        </button>
+      </div>
+      {Boolean(doc.meta?.tagged_by) && (
+        <p className="note mt-1 text-ink-faint">
+          Last updated by <span className="font-semibold text-ink">{String(doc.meta?.tagged_by)}</span>
+          {doc.meta?.tagged_at ? ` on ${format(new Date(String(doc.meta.tagged_at)), "dd MMM yyyy HH:mm")}` : ""}
+          {doc.meta?.provenance_notes ? ` · "${String(doc.meta.provenance_notes)}"` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function Page() { return <Suspense><Sources /></Suspense>; }

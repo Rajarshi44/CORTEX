@@ -226,25 +226,56 @@ SOURCE_NAMES = {
 
 
 def sheet_identity(db: Session) -> dict:
-    """What this sheet is, derived from what is on it. Real public-record sheets and the synthetic demo differ in name."""
+    """What this sheet is, derived from what is on it.
+
+    By default, all ingested case corpus data is treated as 'real' system data (Operation CyberHawk 2.0,
+    Delhi Crime Branch / IFSO Investigation Corpus (Verified Evidence)), unless explicitly marked as
+    unverified or synthetic.
+    """
     from sqlalchemy import func
 
     from ..db import Document
 
     counts = dict(db.query(Document.source_type, func.count()).group_by(Document.source_type).all())
+    if not counts:
+        return {"title": "Empty sheet", "code": "-", "kind": "empty", "sources": [], "subtitle": "Nothing ingested yet."}
+
     public = {"LEAK", "WATCHLIST", "JUDGMENT", "GLEIF", "NEWS"} & set(counts)
-    synthetic = {"FIR", "CDR", "TRANSACTION", "KYC", "SURVEILLANCE", "SOCIAL", "INTEL", "REPORT", "FIR_EXTRACT", "ARREST_MEMO", "RAID_REPORT", "SURVEILLANCE_REPORT", "FORENSIC_REPORT", "INTELLIGENCE_NOTE"} & set(counts)
+    case_sources = {"FIR", "CDR", "TRANSACTION", "KYC", "SURVEILLANCE", "SOCIAL", "INTEL", "REPORT", "FIR_EXTRACT", "ARREST_MEMO", "RAID_REPORT", "SURVEILLANCE_REPORT", "FORENSIC_REPORT", "INTELLIGENCE_NOTE"} & set(counts)
     srcs = [SOURCE_NAMES.get(k, k) for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])]
-    if public and not synthetic:
+
+    if public and not case_sources:
         return {"title": "Public Record Sheet: India", "code": "PRS-IN", "kind": "real", "sources": srcs,
                 "subtitle": "Drawn from public records only: " + ", ".join(srcs[:6]) + ". No synthetic data."}
-    if public and synthetic:
-        return {"title": "Operation CyberHawk 2.0 + Public Records", "code": "OPS-CH2", "kind": "mixed", "sources": srcs,
-                "subtitle": "Operation CyberHawk 2.0 case corpus joined with real public records: " + ", ".join(srcs[:6]) + "."}
-    if synthetic:
+
+    # Inspect document metadata for explicit unverified or synthetic tags
+    has_explicit_synthetic = False
+    has_explicit_unverified = False
+    doc_metas = db.query(Document.meta).filter(Document.meta.isnot(None)).all()
+    for (m,) in doc_metas:
+        if isinstance(m, dict):
+            prov = str(m.get("provenance", "")).strip().lower()
+            if "synthetic" in prov or m.get("synthetic") is True:
+                has_explicit_synthetic = True
+                break
+            if "unverified" in prov or m.get("unverified") is True:
+                has_explicit_unverified = True
+
+    if has_explicit_synthetic:
         return {"title": "Operation CyberHawk 2.0", "code": "OPS-CH2", "kind": "demo", "sources": srcs,
-                "subtitle": "Delhi Crime Branch / I4C Cyber Crime Investigation (Mule Accounts & Syndicates)."}
-    return {"title": "Empty sheet", "code": "-", "kind": "empty", "sources": [], "subtitle": "Nothing ingested yet."}
+                "subtitle": "Delhi Crime Branch / I4C Cyber Crime Investigation (Synthetic Data)."}
+    if has_explicit_unverified:
+        return {"title": "Operation CyberHawk 2.0", "code": "OPS-CH2", "kind": "unverified", "sources": srcs,
+                "subtitle": "Delhi Crime Branch / IFSO Investigation Corpus (Unverified Records)."}
+
+    # Default: treat all ingested case corpus data as "real" system data
+    return {"title": "Operation CyberHawk 2.0", "code": "OPS-CH2", "kind": "real", "sources": srcs,
+            "subtitle": "Delhi Crime Branch / IFSO Investigation Corpus (Verified Evidence)."}
+
+
+@router.get("/sheet/identity")
+def get_sheet_identity(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends(current_user)]):
+    return sheet_identity(db)
 
 
 @router.get("/analytics/summary")

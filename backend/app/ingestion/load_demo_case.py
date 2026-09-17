@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -106,6 +107,28 @@ REL_TYPE = {
 }
 # Verbs whose direction in the CSV is the opposite of the direction the graph stores.
 REVERSED = {"RECRUITED"}
+
+
+def map_relationship(raw: str, target: Entity | None) -> str | None:
+    """Map CSV relationship verbs to the analytical relationship vocabulary.
+
+    CONTROLS is contextual based on target entity type:
+      - Target is PERSON or ORGANIZATION -> CONTROLS (command structure edge)
+      - Target is BANK_ACCOUNT or CRYPTO_WALLET -> OWNS_ACCOUNT
+      - Target is PHONE or SIM -> USES_PHONE
+    """
+    raw_u = raw.upper()
+    if raw_u == "CONTROLS":
+        if target is not None:
+            if target.type in ("PERSON", "ORGANIZATION"):
+                return "CONTROLS"
+            if target.type in ("BANK_ACCOUNT", "CRYPTO_WALLET"):
+                return "OWNS_ACCOUNT"
+            if target.type in ("PHONE", "SIM"):
+                return "USES_PHONE"
+        return "CONTROLS"
+    return REL_TYPE.get(raw_u)
+
 
 # A document type says what kind of record it is, and that decides what it can assert. An arrest
 # memo names an accused; a surveillance or forensic report names a subject; an intelligence note
@@ -210,17 +233,32 @@ def _load(db: Session) -> dict:
         if etype is None:
             continue
         role = r["role_in_network"]
+        status = r["status"]
+        name = r["name"]
+
+        party_role = None
+        if r["entity_id"] == "P001" or "victim" in name.lower() or "victim" in role.lower():
+            party_role = "victim"
+        elif "complainant" in status.lower() or "complainant" in role.lower():
+            party_role = "complainant"
+        elif "witness" in status.lower() or "witness" in role.lower():
+            party_role = "witness"
+        elif "police" in status.lower() or "police" in role.lower():
+            party_role = "police"
+
         attrs = {
             "record_id": r["entity_id"],
             "sub_network": r["sub_network"],
             "role_in_network": role,
-            "status": r["status"],
+            "status": status,
             "risk_flag": r["risk_flag"],
             "city": r["location_city"],
             "state": r["location_state"],
             "age": int(_num(r["age"])) if _num(r["age"]) else None,
             "notes": r["notes"],
         }
+        if party_role:
+            attrs["party_role"] = party_role
         # A mule SIM and a spoofed number are, in the record, numbers nobody verified. That is the
         # signal the burner detector and the "unverified identity" suspicion term both read.
         if etype == "PHONE":
@@ -246,9 +284,11 @@ def _load(db: Session) -> dict:
     # ---------------------------------------------------------------- 2. relationships
     for r in _rows("02_relationships_edges.csv"):
         raw = r["relationship_type"].upper()
-        rel = REL_TYPE.get(raw)
         u, v = ent.get(r["source_id"]), ent.get(r["target_id"])
-        if not rel or not u or not v:
+        if not u or not v:
+            continue
+        rel = map_relationship(raw, v)
+        if not rel:
             continue
         if raw in REVERSED:
             u, v = v, u
@@ -388,17 +428,42 @@ def _load(db: Session) -> dict:
         acct = ent.get(r["linked_account"])
         when = _dt(r["filing_date"])
         amount = _num(r["amount_defrauded_inr"])
+        c_name = r.get("complainant_name", "").strip()
+        c_ent = None
+        if c_name:
+            if c_name.lower() == "victim":
+                c_ent = ent.get("P001")
+                if c_ent:
+                    c_ent.attributes = {**c_ent.attributes, "party_role": "victim"}
+            else:
+                c_id = f"comp-{r['complaint_id'].replace('/', '-')}"
+                c_ent = put(c_id, "PERSON", c_name, {
+                    "record_id": r["complaint_id"],
+                    "party_role": "complainant",
+                    "status": "Complainant",
+                    "role_in_network": "Complainant",
+                    "city": r.get("complainant_city"),
+                    "state": r.get("complainant_state"),
+                    "notes": f"Complainant in {r['complaint_id']} (defrauded ₹{amount:,.0f})",
+                })
         if acct:
             add_entity_evidence(db, ncrp_doc.id, acct.id,
                                 f"{r['complaint_id']}: ₹{amount:,.0f} — {r['modus_operandi']} "
                                 f"({r['complainant_city']}, {r['complainant_state']})", 1.0, when, "structured")
             touch(acct, when)
+        if c_ent:
+            add_entity_evidence(db, ncrp_doc.id, c_ent.id,
+                                f"{r['complaint_id']}: ₹{amount:,.0f} — {r['modus_operandi']} "
+                                f"({r['complainant_city']}, {r['complainant_state']})", 1.0, when, "structured")
+            touch(c_ent, when)
         if when:
-            add_event(db, ncrp_doc.id, "COMPLAINT", when, [acct.id] if acct else [],
+            actors = ([c_ent.id] if c_ent else []) + ([acct.id] if acct else [])
+            add_event(db, ncrp_doc.id, "COMPLAINT", when, actors,
                       f"{r['complaint_id']}: ₹{amount:,.0f} defrauded — {r['modus_operandi']}",
                       {"complaint_id": r["complaint_id"], "amount": amount,
                        "modus_operandi": r["modus_operandi"], "city": r["complainant_city"],
-                       "police_station": r["police_station"], "status": r["investigation_status"]},
+                       "police_station": r["police_station"], "status": r["investigation_status"],
+                       "complainant": c_name},
                       *(city_pt.get(r["complainant_city"].lower()) or (None, None)))
     if hub is not None:
         total = sum(_num(r["amount_defrauded_inr"]) for r in ncrp)
@@ -429,7 +494,8 @@ def _load(db: Session) -> dict:
 
     holder_of: dict[str, str] = {}   # account CSV id -> holder name, for the detectors' prose
     for r in _rows("02_relationships_edges.csv"):
-        if REL_TYPE.get(r["relationship_type"].upper()) == "OWNS_ACCOUNT":
+        v = ent.get(r["target_id"])
+        if map_relationship(r["relationship_type"], v) == "OWNS_ACCOUNT":
             u = ent.get(r["source_id"])
             if u is not None:
                 holder_of.setdefault(r["target_id"], u.label)
@@ -484,7 +550,78 @@ def _load(db: Session) -> dict:
         for i in ids:
             seen.setdefault(i, []).append(when)
 
-    # ---------------------------------------------------------------- 8. finish
+    # ---------------------------------------------------------------- 8. call detail records (CDR)
+    cdr_rows = _rows("09_cdr.csv") if (DEMO_DIR / "09_cdr.csv").exists() else []
+    if cdr_rows:
+        min_call = min((r["call_time"] for r in cdr_rows if r.get("call_time")), default="")
+        cdr_doc = document("CDR-RECORDS", "CDR",
+                           f"Call detail record register ({len(cdr_rows)} calls)",
+                           "Consolidated call detail records (CDR) recovered from telecom service "
+                           "providers for suspect numbers, burner phones, and victim lines.",
+                           {"source_file": "09_cdr.csv", "calls": len(cdr_rows)},
+                           _dt(min_call))
+        cdr_doc.record_count = len(cdr_rows)
+
+        phone_index: dict[str, Entity] = {}
+        for eid, e in ent.items():
+            if e.type == "PHONE":
+                phone_index[eid.lower()] = e
+                for num in re.findall(r"\+?\d{10,15}", e.label):
+                    phone_index[num.lower()] = e
+                    d = re.sub(r"\D", "", num)
+                    phone_index[d] = e
+                    if len(d) == 12 and d.startswith("91"):
+                        phone_index[d[2:]] = e
+
+        def resolve_phone_entity(val: str, is_intl_flag: bool = False, sub_net: str = "") -> Entity:
+            key = val.strip().lower()
+            if key in phone_index:
+                return phone_index[key]
+            digits = re.sub(r"\D", "", val)
+            if digits in phone_index:
+                return phone_index[digits]
+            is_foreign = is_intl_flag or (val.startswith("+") and not val.startswith("+91")) or (len(digits) > 10 and not digits.startswith("91"))
+            label = f"Foreign Phone - [{val}]" if is_foreign else f"Phone - [{val}]"
+            attrs = {
+                "record_id": val,
+                "external": True,
+                "international": True if is_foreign else None,
+                "kyc_status": "unverified",
+                "sub_network": sub_net or None,
+                "notes": "Foreign counterparty phone from CDR analysis" if is_foreign else "External phone from CDR analysis",
+            }
+            new_ent = put(val, "PHONE", label, attrs)
+            phone_index[key] = new_ent
+            if digits:
+                phone_index[digits] = new_ent
+            return new_ent
+
+        for r in cdr_rows:
+            when = _dt(r["call_time"])
+            if when is None:
+                continue
+            is_intl = r.get("is_international", "").strip().upper() in ("TRUE", "1", "YES")
+            sub_net = r.get("sub_network", "")
+            u_phone = resolve_phone_entity(r["caller_phone"], is_intl_flag=is_intl, sub_net=sub_net)
+            v_phone = resolve_phone_entity(r["callee_phone"], is_intl_flag=is_intl, sub_net=sub_net)
+            dur = int(_num(r.get("duration_sec"), 60.0))
+            is_night = bool(when.hour >= 23 or when.hour < 5)
+            call_type = r.get("call_type") or "VOICE"
+
+            add_event(db, cdr_doc.id, "CALL", when, [u_phone.id, v_phone.id],
+                      f"{call_type.title()} call ({dur}s) — {u_phone.label} → {v_phone.label}",
+                      {"caller": r["caller_phone"], "callee": r["callee_phone"],
+                       "duration": dur, "duration_sec": dur, "night": is_night,
+                       "call_type": call_type, "sub_network": sub_net,
+                       "is_international": is_intl, "call_id": r.get("call_id")})
+
+            acc.add(u_phone.id, v_phone.id, "CALLED", weight=1.0, at=when, doc_id=cdr_doc.id,
+                    attrs={"duration_sec": dur, "night": is_night, "call_type": call_type},
+                    extractor="structured")
+            touch(u_phone, when)
+            touch(v_phone, when)
+
+    # ---------------------------------------------------------------- 9. finish
     for e in ent.values():
         ts = sorted(seen.get(e.id, []))
         if ts:
@@ -522,6 +659,7 @@ def _load(db: Session) -> dict:
         "watches": len(WATCHES),
         "watch_hits": watch_hits,
         "transfers": len(txns),
+        "calls": len(cdr_rows),
         "span": f"{first_txn:%d %b %Y} – {last_txn:%d %b %Y}" if first_txn and last_txn else "—",
         "nodes": snap.get("summary", {}).get("nodes", 0),
         "edges": snap.get("summary", {}).get("edges", 0),

@@ -140,7 +140,8 @@ def documents(db: Annotated[Session, Depends(get_session)], _: Annotated[User, D
         query = query.filter(Document.title.ilike(f"%{q}%") | Document.content.ilike(f"%{q}%"))
     rows = query.order_by(Document.occurred_at.desc().nullslast()).limit(limit).all()
     return [{"id": d.id, "source_type": d.source_type, "title": d.title, "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None,
-             "records": d.record_count, "preview": (d.content or "")[:200]} for d in rows]
+             "records": d.record_count, "preview": (d.content or "")[:200], "meta": d.meta,
+             "provenance": (d.meta or {}).get("provenance", "Real / Official Records")} for d in rows]
 
 
 @router.get("/documents/{doc_id}")
@@ -160,11 +161,60 @@ def document(doc_id: str, db: Annotated[Session, Depends(get_session)], _: Annot
     bind_url = db.get_bind().url
     db_name = bind_url.database.split("/")[-1] if bind_url.database else "cna"
     db_type = "PostgreSQL" if "postgres" in bind_url.drivername else "SQLite" if "sqlite" in bind_url.drivername else bind_url.drivername
-    
+
     return {"id": d.id, "source_type": d.source_type, "title": d.title, "content": d.content, "meta": d.meta,
+            "provenance": (d.meta or {}).get("provenance", "Real / Official Records"),
             "storage": {"database": f"{db_type} ({db_name})", "table": "documents"},
             "occurred_at": d.occurred_at.isoformat() if d.occurred_at else None, "records": d.record_count,
             "entities": sorted(ents.values(), key=lambda e: e["type"])}
+
+
+class ProvenanceUpdateIn(BaseModel):
+    provenance: str = "Real / Official Records"
+    notes: str | None = None
+
+
+@router.put("/documents/{doc_id}/provenance", dependencies=[Depends(require_role("analyst"))])
+def update_document_provenance(doc_id: str, body: ProvenanceUpdateIn, user: Annotated[User, Depends(current_user)], db: Annotated[Session, Depends(get_session)]):
+    """Manually update/override a document's provenance status."""
+    from sqlalchemy.orm.attributes import flag_modified
+    from ..db import utcnow
+
+    d = db.get(Document, doc_id)
+    if not d:
+        raise HTTPException(404, f"Document '{doc_id}' not found")
+
+    meta = dict(d.meta or {})
+    meta["provenance"] = body.provenance
+    if body.notes is not None:
+        meta["provenance_notes"] = body.notes
+    meta["tagged_by"] = user.username
+    meta["tagged_at"] = utcnow().isoformat()
+    if body.provenance.lower() == "unverified":
+        meta["unverified"] = True
+        meta.pop("synthetic", None)
+    elif "synthetic" in body.provenance.lower():
+        meta["synthetic"] = True
+        meta.pop("unverified", None)
+    else:
+        meta.pop("unverified", None)
+        meta.pop("synthetic", None)
+
+    d.meta = meta
+    flag_modified(d, "meta")
+    db.commit()
+    db.refresh(d)
+    analysis_service.invalidate()
+    audit(db, user, "tag_provenance", f"Doc {d.id} provenance updated to {body.provenance}")
+    return {
+        "ok": True,
+        "id": d.id,
+        "provenance": d.meta.get("provenance"),
+        "notes": d.meta.get("provenance_notes"),
+        "tagged_by": d.meta.get("tagged_by"),
+        "tagged_at": d.meta.get("tagged_at"),
+        "meta": d.meta,
+    }
 
 
 @router.delete("/reset", dependencies=[Depends(require_role("admin"))])

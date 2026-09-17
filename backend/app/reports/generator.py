@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import re
 from datetime import datetime
 
 import networkx as nx
@@ -9,6 +10,70 @@ from sqlalchemy.orm import Session
 
 from ..db import Alert, Document, Evidence
 from ..graph import queries as Q
+from ..graph.quality import is_protected_party
+
+
+def get_protected_pairs(db: Session | None = None, G: nx.Graph | None = None, D: nx.DiGraph | None = None) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    def add_target(name: str, mask: str):
+        name_clean = name.strip()
+        if not name_clean or name_clean in seen or (name_clean.startswith("[") and name_clean.endswith("]")):
+            return
+        seen.add(name_clean)
+        pairs.append((name_clean, mask))
+
+    nodes = {}
+    if G is not None:
+        for n, data in G.nodes(data=True):
+            nodes[n] = data
+    if D is not None:
+        for n, data in D.nodes(data=True):
+            nodes[n] = data
+
+    for n, data in nodes.items():
+        lbl = data.get("label", "")
+        attrs = data.get("attrs") or {}
+        if is_protected_party(data.get("type", ""), lbl, attrs):
+            pr = (attrs.get("party_role") or "").lower()
+            mask = "[VICTIM]" if ("victim" in pr or "victim" in lbl.lower()) else "[COMPLAINANT]" if "complainant" in pr else "[VICTIM]"
+            if lbl:
+                add_target(lbl, mask)
+            for a in data.get("aliases") or []:
+                if a:
+                    add_target(a, mask)
+
+    if db is not None:
+        from ..db import Entity
+        try:
+            for e in db.query(Entity).all():
+                attrs = e.attributes or {}
+                if is_protected_party(e.type, e.label, attrs):
+                    pr = (attrs.get("party_role") or "").lower()
+                    mask = "[VICTIM]" if ("victim" in pr or "victim" in e.label.lower()) else "[COMPLAINANT]" if "complainant" in pr else "[VICTIM]"
+                    if e.label:
+                        add_target(e.label, mask)
+                    for a in e.aliases or []:
+                        if a:
+                            add_target(a, mask)
+        except Exception:
+            pass
+
+    return sorted(pairs, key=lambda x: len(x[0]), reverse=True)
+
+
+def mask_report_text(text: str, protected_pairs: list[tuple[str, str]] | None = None) -> str:
+    if not text:
+        return text
+    if protected_pairs:
+        for name, mask in protected_pairs:
+            pattern = r"\b" + re.escape(name) + r"\b"
+            text = re.sub(pattern, mask, text)
+    # Generic victim and complainant role masks
+    text = re.sub(r"\bVictim\b", "[VICTIM]", text)
+    text = re.sub(r"\bComplainant\s+\d+\b", "[COMPLAINANT]", text, flags=re.I)
+    return text
 
 
 def build_markdown(db: Session, G: nx.Graph, D: nx.DiGraph, snap: dict, case_name: str = "Network Analysis Brief") -> str:
@@ -57,18 +122,67 @@ def build_markdown(db: Session, G: nx.Graph, D: nx.DiGraph, snap: dict, case_nam
         md.append("")
     md += ["---", "*All findings are analytical leads generated from ingested records and require corroboration before action. "
            "Scores are explainable: see each entity dossier for provenance.*"]
-    return "\n".join(md)
+    raw_md = "\n".join(md)
+    pairs = get_protected_pairs(db, G, D)
+    return mask_report_text(raw_md, pairs)
 
 
-def build_pdf(markdown: str, title: str = "Network Analysis Brief") -> bytes:
+def build_pdf(
+    markdown: str,
+    title: str = "Network Analysis Brief",
+    db: Session | None = None,
+    actor: str = "system",
+) -> bytes:
+    import hashlib
+    from reportlab import rl_config
+    rl_config.pageCompression = 0
+
+    from reportlab.graphics.barcode.qr import QrCodeWidget
+    from reportlab.graphics.shapes import Drawing
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+    from ..graph import ledger
+
+    # Ensure markdown is masked before generating PDF and computing hashes
+    pairs = get_protected_pairs(db)
+    markdown = mask_report_text(markdown, pairs)
+
+    content_hash = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+
+    # If db session is provided, seal the brief content in the ledger to get index & signature
+    if db is not None:
+        brief_seal = ledger.seal_bytes(
+            db, actor=actor, kind="brief", raw_bytes=markdown.encode("utf-8"), filename=f"{title}.md"
+        )
+        verify_url = (
+            f"http://localhost:8001/api/forensics/ledger/verify-brief?hash={brief_seal['hash']}&index={brief_seal['index']}"
+        )
+        seal_info_text = (
+            f"Ledger Entry: <b>#{brief_seal['index']}</b> · Sealed by: <b>{actor}</b><br/>"
+            f"Payload SHA-256: <font face='Courier' size='7'>{brief_seal['hash']}</font><br/>"
+            f"Ed25519 Signature: <font face='Courier' size='7'>{brief_seal['signature'][:32]}…</font>"
+        )
+    else:
+        verify_url = f"http://localhost:8001/api/forensics/ledger/verify-brief?hash={content_hash}"
+        seal_info_text = (
+            f"Payload SHA-256: <font face='Courier' size='7'>{content_hash}</font><br/>"
+            f"Status: Pre-seal analytical brief"
+        )
+
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=18 * mm, bottomMargin=18 * mm, title=title)
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+        title=title,
+    )
     ss = getSampleStyleSheet()
     body = ParagraphStyle("body", parent=ss["BodyText"], fontSize=9.5, leading=13)
     h1 = ParagraphStyle("h1", parent=ss["Heading1"], fontSize=17, textColor=colors.HexColor("#0f172a"))
@@ -78,6 +192,7 @@ def build_pdf(markdown: str, title: str = "Network Analysis Brief") -> bytes:
 
     def inline(t: str) -> str:
         import re
+
         t = t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
         t = re.sub(r"\*(.+?)\*", r"<i>\1</i>", t)
@@ -91,8 +206,14 @@ def build_pdf(markdown: str, title: str = "Network Analysis Brief") -> bytes:
             return
         data = [[Paragraph(inline(c.strip()), body) for c in r] for r in table_rows]
         t = Table(data, repeatRows=1, hAlign="LEFT")
-        t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")), ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#94a3b8")),
-                               ("VALIGN", (0, 0), (-1, -1), "TOP"), ("FONTSIZE", (0, 0), (-1, -1), 8)]))
+        t.setStyle(
+            TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#94a3b8")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ])
+        )
         story.append(t)
         story.append(Spacer(1, 6))
         table_rows = []
@@ -120,5 +241,46 @@ def build_pdf(markdown: str, title: str = "Network Analysis Brief") -> bytes:
         else:
             story.append(Paragraph(inline(line), body))
     flush_table()
+
+    # Append "Verify this brief" QR code & seal info block
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("7. Cryptographic Chain of Custody & Verification", h2))
+
+    qr = QrCodeWidget(verify_url)
+    b = qr.getBounds()
+    w = max(b[2] - b[0], 1)
+    h = max(b[3] - b[1], 1)
+    qr_size = 65
+    d = Drawing(qr_size, qr_size, transform=[qr_size / w, 0, 0, qr_size / h, 0, 0])
+    d.add(qr)
+
+    qr_desc = Paragraph(
+        f"<b>Verify this brief:</b><br/>"
+        f"Scan QR code or visit: <font color='#1e3a8a'>{verify_url}</font><br/>"
+        f"{seal_info_text}<br/>"
+        f"<font size='7' color='#64748b'>Immutable evidence ledger attested via pure RFC 8032 Ed25519 digital signatures & Merkle inclusion chain.</font>",
+        ParagraphStyle("qr_desc", parent=body, fontSize=8, leading=11),
+    )
+    qr_table = Table([[d, qr_desc]], colWidths=[75, 420], hAlign="LEFT")
+    qr_table.setStyle(
+        TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ])
+    )
+    story.append(qr_table)
+
     doc.build(story)
-    return buf.getvalue()
+    pdf_bytes = buf.getvalue()
+
+    # If db session provided, also seal the generated PDF binary bytes in the ledger
+    if db is not None:
+        ledger.seal_bytes(db, actor=actor, kind="pdf", raw_bytes=pdf_bytes, filename=f"{title}.pdf")
+        db.commit()
+
+    return pdf_bytes

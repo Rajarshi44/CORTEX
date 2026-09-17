@@ -23,7 +23,7 @@ export interface DetectorRoster { detectors: Detector[]; total: number; fired: n
 
 export interface NodeView {
   id: string; type: EntityType; label: string; aliases: string[];
-  attrs: Record<string, unknown>; mentions: number;
+  attrs: Record<string, unknown>; attributes?: Record<string, unknown>; mentions: number;
   first_seen: string | null; last_seen: string | null;
   community: number | null; role: string | null; role_reasons: string[];
   influence: number; priority: number; suspicion: number; suspicion_reasons: string[];
@@ -148,8 +148,8 @@ export interface LinkageReport { cases_analysed: number; candidate_links: number
 export interface LinkageSeries { size: number; cohesion: number; members: { document_id: string; title: string; station: string; occurred_at: string | null }[]; common_signature: string[]; recurring_signature: string[]; stations: string[]; cross_jurisdiction: boolean; first_offence: string | null; last_offence: string | null; span_days: number | null; crime_types: string[]; assessment: string }
 export interface LinkagePair { a: string; b: string; a_title: string; b_title: string; score: number; strength: "strong" | "moderate"; components: Record<string, number>; reasons: string[]; context: { distance_km: number | null; days_apart: number | null; same_station: boolean; cross_jurisdiction: boolean } }
 
-export interface DocumentSummary { id: string; source_type: string; title: string; occurred_at: string | null; records: number; preview: string }
-export interface DocumentDetail extends Omit<DocumentSummary, "preview"> { content: string; meta: Record<string, unknown>; storage?: { database: string, table: string }; entities: { id: string; label: string; type: EntityType; snippet: string; confidence: number; extractor: Extractor }[] }
+export interface DocumentSummary { id: string; source_type: string; title: string; occurred_at: string | null; records: number; preview: string; meta?: Record<string, unknown>; provenance?: string }
+export interface DocumentDetail extends Omit<DocumentSummary, "preview"> { content: string; meta: Record<string, unknown>; storage?: { database: string, table: string }; entities: { id: string; label: string; type: EntityType; snippet: string; confidence: number; extractor: Extractor }[]; provenance?: string }
 
 /** A page of the entity table. `total` is the unpaged count, so a view can say what it is not showing. */
 export type EntityPage = {

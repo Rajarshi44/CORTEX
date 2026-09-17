@@ -56,6 +56,16 @@ def current_user(token: Annotated[str | None, Depends(oauth2)], db: Annotated[Se
     return user
 
 
+def optional_user(token: Annotated[str | None, Depends(oauth2)], db: Annotated[Session, Depends(get_session)]) -> User | None:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return db.query(User).filter(User.username == payload.get("sub")).first()
+    except Exception:
+        return None
+
+
 def require_role(min_role: str):
     def dep(user: Annotated[User, Depends(current_user)]) -> User:
         if ROLE_RANK.get(user.role, -1) < ROLE_RANK[min_role]:

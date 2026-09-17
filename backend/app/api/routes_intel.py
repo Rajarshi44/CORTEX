@@ -160,7 +160,11 @@ def report_pdf(db: Annotated[Session, Depends(get_session)], user: Annotated[Use
     G, D = graph_cache.get(db), graph_cache.get_directed(db)
     md = build_markdown(db, G, D, analysis_service.snapshot(db))
     audit(db, user, "report_pdf")
-    return Response(build_pdf(md), media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=network-brief.pdf"})
+    return Response(
+        build_pdf(md, title="Network Analysis Brief", db=db, actor=user.username),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=network-brief.pdf"},
+    )
 
 
 @router.get("/geo")
@@ -192,6 +196,26 @@ def geo(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depends
                "placed_at": ((e.details or {}).get("geo") or {}).get("matched")}
               for e in rows]
     return {"locations": locs, "events": events,
+            "center": [77.2090, 28.6139],
+            "zoom": 10.5,
+            "default_center": [77.2090, 28.6139],
+            "default_zoom": 10.5,
             "kinds": sorted({e["kind"] for e in events}),
             "meta": {"events": len(events), "locations": len(locs),
-                     "events_total": db.query(TimelineEvent).count()}}
+                     "events_total": db.query(TimelineEvent).count(),
+                     "default_center": [77.2090, 28.6139],
+                     "default_zoom": 10.5}}
+
+
+@router.get("/geo/config")
+def geo_config(_: Annotated[User, Depends(current_user)]):
+    """Default geographic viewport configuration centered on Delhi NCR."""
+    return {
+        "city": "Delhi",
+        "center": [77.2090, 28.6139],
+        "default_center": [77.2090, 28.6139],
+        "zoom": 10.5,
+        "default_zoom": 10.5,
+        "coordinates": {"lng": 77.2090, "lat": 28.6139},
+        "bbox": [76.84, 28.40, 77.35, 28.88],
+    }

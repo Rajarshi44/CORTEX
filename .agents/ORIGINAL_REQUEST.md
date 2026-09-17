@@ -42,3 +42,55 @@ The system must include a functioning web-based UI dashboard connected to the ba
 ### UI Verification
 - [ ] The frontend must successfully compile/build without fatal errors.
 - [ ] A basic integration test or end-to-end test (e.g., using Playwright or basic curl checks on frontend routes) must verify that the dashboard loads and successfully connects to the backend API.
+
+## 2026-09-17T20:10:06Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+
+Fix and polish the CORTEX application for an SIH 2026 demo, focusing on victim protection, demo reliability, AI chat, data tagging, and a verifiable ledger.
+
+Working directory: `c:\Users\NIRJHAR BARMA\Desktop\batcave`
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Victim Protection & Masking
+Add party roles (victim, complainant, witness, police). Exclude these roles from risk scoring, first-time-offender scoring, and community membership. Mask victim identities by role throughout the UI (including the Brief and PDF).
+
+### R2. Investigator AI Chat
+Replace the canned answers with a functional chat. Use a real LLM API (e.g., Gemini or OpenAI). The chat must ask for case-specific details to answer accurately, fetch data from the database, and provide a functional option to search the internet (articles, news, etc.).
+
+### R3. Demo Loader Fixes
+Correctly fix the command structure edges (`REL_TYPE` mapping) in the demo loader (e.g., preventing `CONTROLS` from becoming `OWNS_ACCOUNT`).
+
+### R4. Synthetic Data Tagging
+Treat all ingested data as real system data by default, unless explicitly marked as unverified or from uploaded sources. Add UI capabilities for manual tagging if automated tagging fails to correctly tag.
+
+### R5. Verifiable Evidence Ledger
+Implement the "blockchain" claims using real cryptography: Sign entries (Ed25519) and create Merkle batches with inclusion proofs using a standard Python crypto library. Persist an external anchor, seal CSV bytes and PDF exports, and add a "verify this brief" QR code.
+
+### R6. Demo Reliability & UI Polish
+Fix the map rendering (resolve the MapLibre bug, center on Delhi). Add a small CDR file to ensure call detectors fire. Remove the "SYNTHETIC DEMO DATA" ribbon and fix provenance labels. 
+*Note: Do NOT fix security flaws like the JWT secret, rate limiting, or raw PII storage, as requested by the user.*
+
+## Acceptance Criteria
+
+### Victim Protection
+- [ ] No victim or complainant entities appear in the top risk rankings.
+- [ ] Victim names are replaced with masked roles (e.g., "[VICTIM]") in the frontend.
+
+### Investigator AI Chat
+- [ ] Queries for case facts retrieve actual database content using a real LLM.
+- [ ] A web search fallback/option successfully retrieves live data from the internet.
+
+### Loader & Data Tagging
+- [ ] Graph database shows correct edge types for command structures.
+- [ ] Ingested data displays "Real" or verified provenance unless manually overridden.
+
+### Ledger & Demo Reliability
+- [ ] Ledger exports contain verifiable cryptographic signatures and a QR code.
+- [ ] Map renders correctly, centered on Delhi, with visible basemap tiles.
+- [ ] Call detectors fire successfully using the provided CDR file.

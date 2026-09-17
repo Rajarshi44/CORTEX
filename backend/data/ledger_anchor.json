@@ -1,0 +1,10 @@
+{
+  "height": 19,
+  "head_hash": "bc709319543bd1c63f7bf6460131f6e81485aa1e52df027ec5e18b049e8e1a5b",
+  "merkle_root": "c8ad2d9f85378ad4d941318f13800404d657b7273b1d483aac1f4ca0cedc08fe",
+  "signature": "93349cfdab36ac59a43a5e5c14d60d8cce147634c93730084c1134a5f53a77d7f7f86591c9a6a763c90e7cde91e200a5be586244b4440c5a185a3a282f488b0d",
+  "public_key": "851523d1189e2304c6f45ce0b41fdcb24bb8570ac728d81bde14fa27fc955f55",
+  "timestamp": "2026-09-17T20:52:16.203009+00:00",
+  "status": "anchored",
+  "note": "External anchor publishing head hash & Merkle root signed via Ed25519"
+}

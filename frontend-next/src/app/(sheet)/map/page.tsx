@@ -7,11 +7,38 @@ import { useGeo, useTimeline, useHistogram } from "@/lib/queries";
 import { useSheet } from "@/lib/store";
 import TitleBlock from "@/components/sheet/TitleBlock";
 import Narrative from "@/components/sheet/Narrative";
-import { INK } from "@/lib/notation";
+import { INK, maskLabel } from "@/lib/notation";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
-const STYLE = "https://tiles.openfreemap.org/styles/positron";
+const DEFAULT_CENTER: [number, number] = [77.2090, 28.6139]; // Delhi National Capital Region [lng, lat]
+const DEFAULT_ZOOM = 10.5;
+
+// Robust raster basemap using CartoDB Positron and OpenStreetMap fallback
+const MAP_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  sources: {
+    "raster-tiles": {
+      type: "raster",
+      tiles: [
+        "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+    },
+  },
+  layers: [
+    {
+      id: "raster-layer",
+      type: "raster",
+      source: "raster-tiles",
+      minzoom: 0,
+      maxzoom: 19,
+    },
+  ],
+};
 
 export default function MapLens() {
   const { data: geo } = useGeo();
@@ -46,9 +73,14 @@ export default function MapLens() {
 
   useEffect(() => {
     if (!boxRef.current || mapRef.current) return;
-    const map = new maplibregl.Map({ container: boxRef.current, style: STYLE, center: [72.9, 19.08], zoom: 9.6, attributionControl: { compact: true } });
-    // Without this the basemap fails silently: a style, tile, glyph or worker failure leaves a
-    // grey container and nothing in the console to say why.
+    const map = new maplibregl.Map({
+      container: boxRef.current,
+      style: MAP_STYLE,
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      attributionControl: { compact: true },
+    });
+    // Log any tile or rendering errors for diagnostics
     map.on("error", (e) => console.error("[maplibre]", (e as unknown as { error?: { message?: string } }).error?.message ?? e));
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     mapRef.current = map;
@@ -59,7 +91,7 @@ export default function MapLens() {
   useEffect(() => {
     const map = mapRef.current; if (!map || !geo) return;
     const paint = () => {
-      const src = { type: "FeatureCollection", features: geo.locations.map((l) => ({ type: "Feature", geometry: { type: "Point", coordinates: [l.lon, l.lat] }, properties: { id: l.id, label: l.label, risk: l.risk, actors: l.actors, poi: l.poi.length } })) } as GeoJSON.FeatureCollection;
+      const src = { type: "FeatureCollection", features: geo.locations.map((l) => ({ type: "Feature", geometry: { type: "Point", coordinates: [l.lon, l.lat] }, properties: { id: l.id, label: maskLabel(l.label), risk: l.risk, actors: l.actors, poi: l.poi.length } })) } as GeoJSON.FeatureCollection;
       if (map.getSource("locs")) (map.getSource("locs") as maplibregl.GeoJSONSource).setData(src);
       else {
         map.addSource("locs", { type: "geojson", data: src });
@@ -71,13 +103,22 @@ export default function MapLens() {
       }
     };
     if (map.isStyleLoaded()) paint(); else map.once("load", paint);
-    // Frame what the sheet actually covers. A fixed Mumbai viewport was right for the synthetic
-    // case and wrong for a corpus that spans the country.
+    // Frame what the sheet actually covers. Fit bounds only when points exist and span an area.
     if (geo.locations.length) {
       const b = new maplibregl.LngLatBounds();
       for (const l of geo.locations) b.extend([l.lon, l.lat]);
       for (const e of geo.events) if (e.lat && e.lon) b.extend([e.lon, e.lat]);
-      map.fitBounds(b, { padding: 64, maxZoom: 9, animate: false });
+      const sw = b.getSouthWest();
+      const ne = b.getNorthEast();
+      if (Math.abs(sw.lat - ne.lat) > 0.02 || Math.abs(sw.lng - ne.lng) > 0.02) {
+        map.fitBounds(b, { padding: 64, maxZoom: 12, animate: false });
+      } else {
+        map.setCenter([sw.lng, sw.lat]);
+        map.setZoom(DEFAULT_ZOOM);
+      }
+    } else {
+      map.setCenter(DEFAULT_CENTER);
+      map.setZoom(DEFAULT_ZOOM);
     }
   }, [geo, select, presentation]);
 
@@ -112,7 +153,7 @@ export default function MapLens() {
         </div>
         <aside className="pointer-events-auto absolute right-3 top-3 z-10 hidden max-h-[60%] w-[22rem] flex-col note-paper lg:flex">
           <h2 className="label label-ink border-b border-rule-strong px-3 py-1.5">Events in window · {events?.length ?? 0}{eventsTotal > (events?.length ?? 0) ? ` of ${eventsTotal}` : ""}</h2>
-          <ol className="min-h-0 flex-1 overflow-y-auto">{listed.map((e) => <li key={e.id} className="border-b border-rule px-3 py-1 text-[length:var(--fs-note)]"><button type="button" onClick={() => { const a = e.actors?.[0]; if (a) select(a.id); }} className="block w-full text-left hover:text-pencil"><span className="figure text-ink-faint">{format(new Date(e.at), "dd MMM HH:mm")}</span> <span className="label text-ink-faint">{e.kind}</span><span className="block truncate text-ink">{e.summary}</span></button></li>)}</ol>
+          <ol className="min-h-0 flex-1 overflow-y-auto">{listed.map((e) => <li key={e.id} className="border-b border-rule px-3 py-1 text-[length:var(--fs-note)]"><button type="button" onClick={() => { const a = e.actors?.[0]; if (a) select(a.id); }} className="block w-full text-left hover:text-pencil"><span className="figure text-ink-faint">{format(new Date(e.at), "dd MMM HH:mm")}</span> <span className="label text-ink-faint">{e.kind}</span><span className="block truncate text-ink">{maskLabel(e.summary)}</span></button></li>)}</ol>
         </aside>
         <div className="pointer-events-none absolute bottom-3 right-3 z-10"><TitleBlock lens="Map" /></div>
       </div>

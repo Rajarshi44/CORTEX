@@ -192,8 +192,13 @@ def entity_dossier(db: Session, G: nx.Graph, D: nx.DiGraph, snapshot: dict, eid:
 
 
 def money_flow(db: Session, G: nx.Graph, D: nx.DiGraph, eid: str) -> dict:
-    """Inbound/outbound money for an actor (via owned accounts) or an account."""
-    accounts = [eid] if G.nodes[eid]["type"] == "BANK_ACCOUNT" else [v for _, v, d in D.out_edges(eid, data=True) if d["rel_type"] == "OWNS_ACCOUNT"]
+    if eid not in G:
+        ent = db.get(Entity, eid)
+        if ent:
+            G.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
+            D.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
+    etype = G.nodes[eid].get("type") if eid in G else ""
+    accounts = [eid] if etype == "BANK_ACCOUNT" else [v for _, v, d in D.out_edges(eid, data=True) if d.get("rel_type") == "OWNS_ACCOUNT"]
     inflow, outflow = defaultdict(float), defaultdict(float)
     tx = []
     for e in db.query(TimelineEvent).filter(TimelineEvent.kind == "TRANSFER").order_by(TimelineEvent.occurred_at).all():
@@ -206,7 +211,7 @@ def money_flow(db: Session, G: nx.Graph, D: nx.DiGraph, eid: str) -> dict:
         elif ids[0] in accounts:
             outflow[e.details.get("to_holder") or ids[1]] += e.details.get("amount", 0)
             tx.append({"at": e.occurred_at.isoformat(), "dir": "out", "counterparty": e.details.get("to_holder"), "amount": e.details.get("amount"), "mode": e.details.get("mode"), "remarks": e.details.get("remarks")})
-    return {"accounts": [G.nodes[a]["label"] for a in accounts], "total_in": round(sum(inflow.values()), 2), "total_out": round(sum(outflow.values()), 2),
+    return {"accounts": [G.nodes[a].get("label", a) if a in G else a for a in accounts], "total_in": round(sum(inflow.values()), 2), "total_out": round(sum(outflow.values()), 2),
             "top_sources": sorted(inflow.items(), key=lambda kv: -kv[1])[:8], "top_destinations": sorted(outflow.items(), key=lambda kv: -kv[1])[:8],
             "transactions": tx[-200:]}
 

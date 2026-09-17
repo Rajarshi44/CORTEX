@@ -34,7 +34,6 @@ from ..db import Case
 from . import tools as T
 from .providers import status as provider_status
 from .providers import stream_with_fallback
-from .demo_fallback import fallback_stream
 
 log = logging.getLogger("cna.agent")
 
@@ -47,7 +46,8 @@ RULES
 - Every claim must come from a tool result. No guessing. Chain: search_entities → analytical tools.
 - Be FAST: 2-4 tool calls max. One broad search, then one or two deep dives.
 - If a name is not found, say so and list closest matches.
-- Corpus is primary. web_search only when the question needs external context; label those facts "open-web, unverified".
+- If the investigator's question is too broad or lacks specific entity or case details, ask for the specific entity name, account number, phone number, or transaction date to provide an accurate investigation.
+- Always retrieve facts from the corpus tools first. If web context is needed or requested, use web_search. Open-web facts must be labelled "open-web, unverified".
 
 OUTPUT FORMAT
 - Lead with the answer in ONE sentence.
@@ -180,13 +180,6 @@ class InvestigatorAgent:
         # Send the "start" block that names the LLM providers we have available
         yield {"type": "start", "providers": provider_status(),
                "provider": None, "model": None, "tools": len(specs)}
-
-        if os.getenv("CNA_DEFAULT_CORPUS", "none").lower() == "none" and self.ctx.db.query(Case).count() > 0:
-            # We are running with the demo case data, so intercept with the hardcoded fallback
-            from .demo_fallback import match
-            if match(question):
-                yield from fallback_stream(question)
-                return
 
         answer_parts: list[str] = []
         seen_visuals = 0

@@ -120,8 +120,11 @@ export const api = {
 
   // ---- forensics
   ledgerVerify: () => request<LedgerVerify>("/api/forensics/ledger/verify"),
-  ledger: (limit = 60) => request<{ entries: { index: number; timestamp: string; actor: string; action: string; subject_type: string; subject_id: string; payload_hash: string; previous_hash: string; entry_hash: string; detail: string }[]; height: number; head_hash: string | null; by_action: Record<string, number> }>(`/api/forensics/ledger${qs({ limit })}`),
-  ledgerAnchor: () => request<{ status: string; head_hash?: string; height?: number; sealed_at?: string; note?: string }>("/api/forensics/ledger/anchor"),
+  ledger: (limit = 60) => request<{ entries: { index: number; timestamp: string; actor: string; action: string; subject_type: string; subject_id: string; payload_hash: string; previous_hash: string; entry_hash: string; signature?: string; detail: string }[]; height: number; head_hash: string | null; merkle_root?: string; public_key?: string; by_action: Record<string, number> }>(`/api/forensics/ledger${qs({ limit })}`),
+  ledgerAnchor: () => request<{ status: string; head_hash?: string; height?: number; merkle_root?: string; signature?: string; public_key?: string; timestamp?: string; sealed_at?: string; note?: string }>("/api/forensics/ledger/anchor"),
+  ledgerProof: (index: number) => request<{ leaf_index: number; leaf_hash: string; root_hash: string; total_leaves: number; audit_path: { position: "left" | "right"; hash: string }[] }>(`/api/forensics/ledger/proof/${index}`),
+  ledgerVerifyProof: (leaf_hash: string, proof: unknown) => request<{ valid: boolean; leaf_hash: string; root_hash: string }>("/api/forensics/ledger/verify-proof", { method: "POST", body: JSON.stringify({ leaf_hash, proof }) }),
+  ledgerVerifyBrief: (hash?: string, index?: number) => request<{ status: string; valid: boolean; index?: number; payload_hash?: string; entry_hash?: string; signature?: string; signature_valid?: boolean; chain_intact?: boolean }>(`/api/forensics/ledger/verify-brief${qs({ hash, index })}`),
   verifyDocument: (id: string) => request<{ status: string; conclusion?: string; sealed_at?: string; reason?: string }>(`/api/forensics/ledger/verify-document/${id}`),
   identifiers: (text: string) => request<{ identifiers: { kind: string; value: string; valid: boolean; sensitive: boolean; attrs: Record<string, unknown> }[]; summary: { counts: Record<string, number>; valid: number; invalid: number; rejected: { kind: string; text: string; reason: string }[] } }>("/api/forensics/identifiers", { method: "POST", body: JSON.stringify({ text, include_invalid: true }) }),
   linkage: (threshold = 0.55, limit = 300) => request<LinkageReport | { status: string; cases_analysed: number; reason: string }>(`/api/forensics/linkage${qs({ threshold, limit })}`),
@@ -138,6 +141,18 @@ export const api = {
   reset: () => request<{ ok: boolean }>("/api/ingest/reset", { method: "DELETE" }),
   documents: (p: { source_type?: string; q?: string; entity_id?: string; limit?: number } = {}) => request<DocumentSummary[]>(`/api/ingest/documents${qs(p)}`),
   document: (id: string) => request<DocumentDetail>(`/api/ingest/documents/${id}`),
+  tagDocument: (document_id: string, provenance: string, notes?: string) =>
+    request<{ ok: boolean; id: string; provenance: string; notes?: string; tagged_by?: string; meta: Record<string, unknown> }>(
+      "/api/sources/tag",
+      { method: "POST", body: JSON.stringify({ document_id, provenance, notes }) }
+    ),
+  updateDocumentProvenance: (doc_id: string, provenance: string, notes?: string) =>
+    request<{ ok: boolean; id: string; provenance: string; notes?: string; meta: Record<string, unknown> }>(
+      `/api/ingest/documents/${doc_id}/provenance`,
+      { method: "PUT", body: JSON.stringify({ provenance, notes }) }
+    ),
+  geoConfig: () =>
+    request<{ city: string; center: [number, number]; default_center: [number, number]; zoom: number; coordinates: { lng: number; lat: number } }>("/api/geo/config"),
 
   // ---- live sources
   sources: () => request<{ sources: SourceInfo[]; cache: { entries: number; bytes: number } }>("/api/sources"),

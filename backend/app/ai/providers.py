@@ -170,52 +170,55 @@ class GeminiProvider(Provider):
             body["toolConfig"] = {"functionCallingConfig": {"mode": "AUTO"}}
         url = f"{self.BASE}/{self.model}:streamGenerateContent"
         calls, usage, stop = 0, {}, "end_turn"
-        with httpx.Client(timeout=httpx.Timeout(240.0, connect=20.0)) as client:
-            with client.stream("POST", url, params={"alt": "sse", "key": self.api_key}, json=body) as resp:
-                if resp.status_code >= 400:
-                    yield ("error", f"gemini HTTP {resp.status_code}: {resp.read().decode('utf-8', 'replace')[:400]}")
-                    return
-                for data in self._sse_data(resp):
-                    if not data or data == "[DONE]":
-                        continue
-                    try:
-                        chunk = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    if "error" in chunk:
-                        yield ("error", f"gemini: {chunk['error'].get('message', 'unknown')}")
+        try:
+            with httpx.Client(timeout=httpx.Timeout(240.0, connect=20.0)) as client:
+                with client.stream("POST", url, params={"alt": "sse", "key": self.api_key}, json=body) as resp:
+                    if resp.status_code >= 400:
+                        yield ("error", f"gemini HTTP {resp.status_code}: {resp.read().decode('utf-8', 'replace')[:400]}")
                         return
-                    if um := chunk.get("usageMetadata"):
-                        usage = {"input_tokens": um.get("promptTokenCount"), "output_tokens": um.get("candidatesTokenCount")}
-                    for cand in chunk.get("candidates", []):
-                        for part in (cand.get("content") or {}).get("parts", []):
-                            if part.get("thought"):
-                                continue
-                            if part.get("text"):
-                                yield ("text", part["text"])
-                            if fc := part.get("functionCall"):
-                                calls += 1
-                                stop = "tool_use"
-                                yield ("tool_use", {"id": f"gm{calls}_{fc['name']}", "name": fc["name"],
-                                                    "input": fc.get("args") or {}})
-                        if cand.get("finishReason") in ("SAFETY", "RECITATION", "PROHIBITED_CONTENT"):
-                            yield ("error", f"gemini stopped: {cand['finishReason']}")
+                    for data in self._sse_data(resp):
+                        if not data or data == "[DONE]":
+                            continue
+                        try:
+                            chunk = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        if "error" in chunk:
+                            yield ("error", f"gemini: {chunk['error'].get('message', 'unknown')}")
                             return
+                        if um := chunk.get("usageMetadata"):
+                            usage = {"input_tokens": um.get("promptTokenCount"), "output_tokens": um.get("candidatesTokenCount")}
+                        for cand in chunk.get("candidates", []):
+                            for part in (cand.get("content") or {}).get("parts", []):
+                                if part.get("thought"):
+                                    continue
+                                if part.get("text"):
+                                    yield ("text", part["text"])
+                                if fc := part.get("functionCall"):
+                                    calls += 1
+                                    stop = "tool_use"
+                                    yield ("tool_use", {"id": f"gm{calls}_{fc['name']}", "name": fc["name"],
+                                                        "input": fc.get("args") or {}})
+                            if cand.get("finishReason") in ("SAFETY", "RECITATION", "PROHIBITED_CONTENT"):
+                                yield ("error", f"gemini stopped: {cand['finishReason']}")
+                                return
+        except httpx.HTTPError as exc:
+            yield ("error", f"gemini network error: {exc}")
+            return
         yield ("done", {"stop_reason": stop, "usage": usage, "provider": self.key, "model": self.model})
 
 
 # --------------------------------------------------------------------------------------- NVIDIA NIM
-class NvidiaNIMProvider(Provider):
-    """NVIDIA NIM - OpenAI-compatible chat completions with tool calling."""
+# --------------------------------------------------------------------------------------- OpenAI-compatible
+class OpenAICompatibleProvider(Provider):
+    """Base class for OpenAI-compatible chat completions with tool calling."""
 
-    key = "nvidia"
-    label = "NVIDIA NIM"
-    BASE = "https://integrate.api.nvidia.com/v1/chat/completions"
-
-    def __init__(self):
-        self.api_key = _env("CNA_NVIDIA_API_KEY", "NVIDIA_API_KEY", "NVIDIA_NIM_API_KEY", "NGC_API_KEY", setting="nvidia_api_key")
-        self.model = _env("CNA_NVIDIA_MODEL", "NVIDIA_MODEL", setting="nvidia_model") or "meta/llama-3.3-70b-instruct"
-        self.base_url = _env("CNA_NVIDIA_BASE_URL", setting="nvidia_base_url") or self.BASE
+    def __init__(self, key: str, label: str, api_key: str | None, model: str, base_url: str):
+        self.key = key
+        self.label = label
+        self.api_key = api_key
+        self.model = model
+        self.base_url = base_url
 
     def available(self) -> bool:
         return bool(self.api_key)
@@ -256,47 +259,109 @@ class NvidiaNIMProvider(Provider):
         pending: dict[int, dict] = {}
         usage, stop = {}, "end_turn"
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "text/event-stream"}
-        with httpx.Client(timeout=httpx.Timeout(240.0, connect=20.0)) as client:
-            with client.stream("POST", self.base_url, json=body, headers=headers) as resp:
-                if resp.status_code >= 400:
-                    yield ("error", f"nvidia HTTP {resp.status_code}: {resp.read().decode('utf-8', 'replace')[:400]}")
-                    return
-                for data in self._sse_data(resp):
-                    if not data or data == "[DONE]":
-                        continue
-                    try:
-                        chunk = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    if u := chunk.get("usage"):
-                        usage = {"input_tokens": u.get("prompt_tokens"), "output_tokens": u.get("completion_tokens")}
-                    for ch in chunk.get("choices", []):
-                        delta = ch.get("delta") or {}
-                        if txt := delta.get("content"):
-                            yield ("text", txt)
-                        for tc in delta.get("tool_calls") or []:
-                            slot = pending.setdefault(tc.get("index", 0), {"id": "", "name": "", "args": ""})
-                            if tc.get("id"):
-                                slot["id"] = tc["id"]
-                            fn = tc.get("function") or {}
-                            if fn.get("name"):
-                                slot["name"] = fn["name"]
-                            if fn.get("arguments"):
-                                slot["args"] += fn["arguments"]
-                        if ch.get("finish_reason") == "tool_calls":
-                            stop = "tool_use"
+        try:
+            with httpx.Client(timeout=httpx.Timeout(240.0, connect=20.0)) as client:
+                with client.stream("POST", self.base_url, json=body, headers=headers) as resp:
+                    if resp.status_code >= 400:
+                        yield ("error", f"{self.key} HTTP {resp.status_code}: {resp.read().decode('utf-8', 'replace')[:400]}")
+                        return
+                    for data in self._sse_data(resp):
+                        if not data or data == "[DONE]":
+                            continue
+                        try:
+                            chunk = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        if u := chunk.get("usage"):
+                            usage = {"input_tokens": u.get("prompt_tokens"), "output_tokens": u.get("completion_tokens")}
+                        for ch in chunk.get("choices", []):
+                            delta = ch.get("delta") or ch.get("message") or {}
+                            if txt := delta.get("content"):
+                                yield ("text", txt)
+                            for tc in delta.get("tool_calls") or []:
+                                slot = pending.setdefault(tc.get("index", 0), {"id": "", "name": "", "args": ""})
+                                if tc.get("id"):
+                                    slot["id"] = tc["id"]
+                                fn = tc.get("function") or {}
+                                if fn.get("name"):
+                                    slot["name"] = fn["name"]
+                                if fn.get("arguments"):
+                                    if isinstance(fn["arguments"], dict):
+                                        slot["args"] = json.dumps(fn["arguments"])
+                                    else:
+                                        slot["args"] += str(fn["arguments"])
+                            if ch.get("finish_reason") in ("tool_calls", "function_call"):
+                                stop = "tool_use"
+        except httpx.HTTPError as exc:
+            yield ("error", f"{self.key} network error: {exc}")
+            return
         # Tool calls arrive as argument fragments, so they can only be emitted once the stream ends.
         for i in sorted(pending):
             slot = pending[i]
             if not slot["name"]:
                 continue
             stop = "tool_use"
-            try:
-                args = json.loads(slot["args"] or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            yield ("tool_use", {"id": slot["id"] or f"nv{i}_{slot['name']}", "name": slot["name"], "input": args})
+            raw_args = slot["args"]
+            if isinstance(raw_args, dict):
+                args = raw_args
+            else:
+                try:
+                    args = json.loads(raw_args or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+            yield ("tool_use", {"id": slot["id"] or f"{self.key[:2]}{i}_{slot['name']}", "name": slot["name"], "input": args})
         yield ("done", {"stop_reason": stop, "usage": usage, "provider": self.key, "model": self.model})
+
+
+# --------------------------------------------------------------------------------------- NVIDIA NIM
+class NvidiaNIMProvider(OpenAICompatibleProvider):
+    """NVIDIA NIM - OpenAI-compatible chat completions with tool calling."""
+
+    BASE = "https://integrate.api.nvidia.com/v1/chat/completions"
+
+    def __init__(self):
+        super().__init__(
+            key="nvidia",
+            label="NVIDIA NIM",
+            api_key=_env("CNA_NVIDIA_API_KEY", "NVIDIA_API_KEY", "NVIDIA_NIM_API_KEY", "NGC_API_KEY", setting="nvidia_api_key"),
+            model=_env("CNA_NVIDIA_MODEL", "NVIDIA_MODEL", setting="nvidia_model") or "meta/llama-3.3-70b-instruct",
+            base_url=_env("CNA_NVIDIA_BASE_URL", setting="nvidia_base_url") or self.BASE,
+        )
+
+
+# --------------------------------------------------------------------------------------- OpenRouter
+class OpenRouterProvider(OpenAICompatibleProvider):
+    """OpenRouter - Multi-model gateway with OpenAI-compatible API."""
+
+    BASE = "https://openrouter.ai/api/v1/chat/completions"
+
+    def __init__(self):
+        base = _env("CNA_OPENROUTER_BASE_URL", setting="openrouter_base_url") or self.BASE
+        if not base.endswith("/chat/completions"):
+            base = f"{base.rstrip('/')}/chat/completions"
+        super().__init__(
+            key="openrouter",
+            label="OpenRouter",
+            api_key=_env("CNA_OPENROUTER_API_KEY", "OPENROUTER_API_KEY", setting="openrouter_api_key"),
+            model=_env("CNA_OPENROUTER_MODEL", "OPENROUTER_MODEL", "CNA_LLM_MODEL", setting="llm_model") or "nvidia/nemotron-3-ultra-550b-a55b:free",
+            base_url=base,
+        )
+
+
+# --------------------------------------------------------------------------------------- OpenAI
+class OpenAIProvider(OpenAICompatibleProvider):
+    """OpenAI API (GPT-4o, etc.)."""
+
+    BASE = "https://api.openai.com/v1/chat/completions"
+
+    def __init__(self):
+        super().__init__(
+            key="openai",
+            label="OpenAI",
+            api_key=_env("CNA_OPENAI_API_KEY", "OPENAI_API_KEY", setting="openai_api_key"),
+            model=_env("CNA_OPENAI_MODEL", "OPENAI_MODEL") or "gpt-4o-mini",
+            base_url=_env("CNA_OPENAI_BASE_URL") or self.BASE,
+        )
 
 
 # --------------------------------------------------------------------------------------- Anthropic
@@ -344,8 +409,12 @@ class AnthropicProvider(Provider):
 # --------------------------------------------------------------------------------------- chain
 def provider_chain() -> list[Provider]:
     """Configured preference order, best first. `CNA_LLM_PROVIDERS` overrides (comma separated)."""
-    catalogue = {p.key: p for p in (GeminiProvider(), NvidiaNIMProvider(), AnthropicProvider())}
-    order = [s.strip().lower() for s in (_env("CNA_LLM_PROVIDERS", setting="llm_providers") or "gemini,nvidia,anthropic").split(",") if s.strip()]
+    catalogue = {p.key: p for p in (GeminiProvider(), OpenRouterProvider(), NvidiaNIMProvider(), OpenAIProvider(), AnthropicProvider())}
+    pref = _env("CNA_LLM_PROVIDERS", setting="llm_providers")
+    if not pref:
+        order = ["gemini", "openrouter", "nvidia", "openai", "anthropic"]
+    else:
+        order = [s.strip().lower() for s in pref.split(",") if s.strip()]
     return [catalogue[k] for k in order if k in catalogue]
 
 
@@ -369,7 +438,7 @@ def stream_with_fallback(system: str, messages: list[dict], tools: list[ToolSpec
     """
     chain = available_providers()
     if not chain:
-        yield ("error", "no LLM provider configured - set CNA_GEMINI_API_KEY, CNA_NVIDIA_API_KEY or CNA_ANTHROPIC_API_KEY")
+        yield ("error", "no LLM provider configured - set CNA_GEMINI_API_KEY, CNA_NVIDIA_API_KEY, CNA_OPENROUTER_API_KEY or CNA_ANTHROPIC_API_KEY")
         return
     last = ""
     for i, p in enumerate(chain):
@@ -384,7 +453,8 @@ def stream_with_fallback(system: str, messages: list[dict], tools: list[ToolSpec
                         yield ("error", last)
                         return
                     break
-                produced = True
+                if (kind == "text" and str(payload).strip()) or kind == "tool_use":
+                    produced = True
                 yield (kind, payload)
         except Exception as exc:
             last, failed = f"{p.key}: {type(exc).__name__}: {exc}", True

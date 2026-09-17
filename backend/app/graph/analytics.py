@@ -26,17 +26,20 @@ import numpy as np
 
 from ..ingestion.quality import is_non_subject
 from . import fastmetrics
+from .quality import PROTECTED_PARTY_ROLES, is_protected_party
 
 ACTOR_TYPES = {"PERSON", "ORGANIZATION"}
 PROXY_OWNERSHIP = {"USES_PHONE", "OWNS_ACCOUNT", "OWNS_HANDLE", "ASSOCIATED_VEHICLE"}
 DIRECT_WEIGHTS = {
     "MET": 2.0, "CO_ACCUSED": 3.0, "REPORTS_TO": 3.0, "COMMUNICATED_WITH": 1.5, "MENTIONED_WITH": 0.5,
     "OWNS": 2.0, "DIRECTOR_OF": 2.0, "AFFILIATED_WITH": 1.0, "ASSOCIATE_OF": 2.0,
+    "CONTROLS": 3.0,
 }
 ROLE_LABELS = {
     "leader": "Leader (insulated)", "coordinator": "Coordinator / Hub", "broker": "Broker / Bridge",
     "financial": "Financial conduit", "operative": "Operative", "peripheral": "Peripheral",
     "unverified": "Unverified identity", "mule": "Money mule", "connector": "Well-connected (no adverse record)",
+    "victim": "Protected Victim", "complainant": "Complainant", "witness": "Witness", "police": "Law Enforcement",
 }
 
 
@@ -188,6 +191,31 @@ def suspicion_signals(D: nx.DiGraph, anomaly_hits: dict[str, float] | None = Non
             sig[u]["org_flag"] = D.nodes[v]["label"]
     out = {}
     for n, s in sig.items():
+        ndata = D.nodes.get(n, {})
+        ntype = ndata.get("type", "")
+        nlabel = ndata.get("label", "")
+        nattrs = ndata.get("attrs") or {}
+        if is_protected_party(ntype, nlabel, nattrs):
+            out[n] = {
+                "score": 0.0,
+                "reasons": [],
+                "accused": 0,
+                "surveillance": 0,
+                "intel": 0,
+                "unverified": 0,
+                "international": 0,
+                "anomaly": 0.0,
+                "complainant": s.get("complainant", 0),
+                "org_flag": None,
+                "watchlist": None,
+                "wanted": 0,
+                "convicted": 0,
+                "offshore": 0,
+                "press": 0,
+                "protected": True,
+            }
+            continue
+
         score = min(1.0, 0.35 * min(s["accused"], 2) + 0.15 * min(s["surveillance"], 2) + 0.2 * min(s["intel"], 2)
                     + 0.25 * min(s["unverified"], 1) + 0.15 * (1 if s["international"] else 0) + 0.3 * s["anomaly"]
                     + (0.6 if s["watchlist"] == "wanted" else 0.45 if s["watchlist"] == "screened" else 0.12 if s["watchlist"] == "weak" else 0.18 if s["watchlist"] else 0)
@@ -222,6 +250,29 @@ def suspicion_signals(D: nx.DiGraph, anomaly_hits: dict[str, float] | None = Non
         if s["anomaly"]:
             reasons.append("involved in detected anomalies" + (f" via {s['org_flag']}" if s.get("org_flag") else ""))
         out[n] = {"score": round(score, 3), "reasons": reasons, **s}
+
+    for n, a in D.nodes(data=True):
+        if n not in out:
+            at = a.get("attrs") or {}
+            if is_protected_party(a.get("type", ""), a.get("label", ""), at):
+                out[n] = {
+                    "score": 0.0,
+                    "reasons": [],
+                    "accused": 0,
+                    "surveillance": 0,
+                    "intel": 0,
+                    "unverified": 0,
+                    "international": 0,
+                    "anomaly": 0.0,
+                    "complainant": 0,
+                    "org_flag": None,
+                    "watchlist": None,
+                    "wanted": 0,
+                    "convicted": 0,
+                    "offshore": 0,
+                    "press": 0,
+                    "protected": True,
+                }
     return out
 
 
@@ -250,11 +301,30 @@ def compute_metrics(P: nx.Graph) -> dict[str, dict[str, float]]:
 
 
 def detect_communities(P: nx.Graph, seed: int = 42) -> dict[str, int]:
-    if P.number_of_edges() == 0:
-        return {n: i for i, n in enumerate(P)}
-    comms = nx.community.louvain_communities(P, weight="weight", seed=seed, resolution=1.0)
-    comms = sorted(comms, key=len, reverse=True)
-    return {n: i for i, c in enumerate(comms) for n in c}
+    if P.number_of_nodes() == 0:
+        return {}
+    protected_nodes = {
+        n for n in P
+        if is_protected_party(P.nodes[n].get("type", ""), P.nodes[n].get("label", ""), P.nodes[n].get("attrs") or {})
+    }
+    non_protected = [n for n in P if n not in protected_nodes]
+    if not non_protected:
+        return {n: -1 for n in P}
+    sub = P.subgraph(non_protected)
+    if sub.number_of_edges() == 0:
+        res = {n: i for i, n in enumerate(non_protected)}
+    else:
+        comms = nx.community.louvain_communities(sub, weight="weight", seed=seed, resolution=1.0)
+        comms = sorted(comms, key=len, reverse=True)
+        res = {n: i for i, c in enumerate(comms) for n in c}
+        next_id = len(comms)
+        for n in non_protected:
+            if n not in res:
+                res[n] = next_id
+                next_id += 1
+    for n in protected_nodes:
+        res[n] = -1
+    return res
 
 
 def classify_roles(P: nx.Graph, metrics: dict, community: dict[str, int], D: nx.DiGraph, susp: dict) -> dict[str, dict]:
@@ -313,6 +383,35 @@ def classify_roles(P: nx.Graph, metrics: dict, community: dict[str, int], D: nx.
     roles: dict[str, dict] = {}
     for n, m in metrics.items():
         node = P.nodes[n]
+        at = node.get("attrs") or {}
+        if is_protected_party(node.get("type", ""), node.get("label", ""), at):
+            pr = (at.get("party_role") or "").lower().strip()
+            if not pr:
+                rin = (at.get("role_in_network") or "").lower()
+                st = (at.get("status") or "").lower()
+                lbl = (node.get("label") or "").lower()
+                if "victim" in rin or "victim" in st or "victim" in lbl:
+                    pr = "victim"
+                elif "complainant" in rin or "complainant" in st or "complainant" in lbl:
+                    pr = "complainant"
+                elif "witness" in rin or "witness" in st:
+                    pr = "witness"
+                elif "police" in rin or "police" in st:
+                    pr = "police"
+                else:
+                    pr = "victim"
+            if pr not in ROLE_LABELS:
+                pr = "victim" if "victim" in pr else "complainant"
+            role = pr
+            roles[n] = {
+                "role": role,
+                "label": ROLE_LABELS.get(role, role.title()),
+                "reasons": [f"Protected party ({ROLE_LABELS.get(role, role.title())})"],
+                "community_span": 0,
+                "accused_count": 0,
+            }
+            continue
+
         nb = list(P.neighbors(n))
         spans = len({community.get(x) for x in nb} - {community.get(n)})
         s = susp.get(n, {})
@@ -340,8 +439,18 @@ def classify_roles(P: nx.Graph, metrics: dict, community: dict[str, int], D: nx.
     return roles
 
 
-def priority_scores(metrics: dict, susp: dict) -> dict[str, float]:
-    return {n: round(0.55 * m["influence"] + 0.45 * susp.get(n, {}).get("score", 0.0), 4) for n, m in metrics.items()}
+def priority_scores(metrics: dict, susp: dict, P: nx.Graph | None = None) -> dict[str, float]:
+    scores = {}
+    for n, m in metrics.items():
+        s = susp.get(n, {})
+        is_prot = s.get("protected", False)
+        if not is_prot and P is not None and n in P:
+            is_prot = is_protected_party(P.nodes[n].get("type", ""), P.nodes[n].get("label", ""), P.nodes[n].get("attrs") or {})
+        if is_prot:
+            scores[n] = 0.0
+        else:
+            scores[n] = round(0.55 * m["influence"] + 0.45 * s.get("score", 0.0), 4)
+    return scores
 
 
 def link_predictions(P: nx.Graph, metrics: dict, susp: dict, top: int = 20) -> list[dict]:
@@ -408,6 +517,8 @@ def summarize_communities(P: nx.Graph, D: nx.DiGraph, community: dict[str, int],
             locs[u][D.nodes[v]["label"]] += d["count"]
     out = []
     for cid, members in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        if cid == -1:
+            continue
         ranked = sorted(members, key=lambda n: -priority.get(n, 0))
         top = ranked[0]
         loc_counter = Counter()
@@ -434,10 +545,12 @@ def key_players(P: nx.Graph, metrics: dict, roles: dict, community: dict, priori
     ranked = sorted(priority.items(), key=lambda kv: -kv[1])
     out = []
     # a name with no ties is a record, not a player; and a judge, the State or a court is the
-    # machinery of the case rather than a player in it
+    # machinery of the case rather than a player in it. Protected parties are strictly excluded.
     ranked = [(n, p) for n, p in ranked
               if metrics[n]["degree"] >= 0
-              and not is_non_subject(P.nodes[n].get("type", ""), P.nodes[n].get("label", ""), P.nodes[n].get("attrs") or {})]
+              and not is_non_subject(P.nodes[n].get("type", ""), P.nodes[n].get("label", ""), P.nodes[n].get("attrs") or {})
+              and not is_protected_party(P.nodes[n].get("type", ""), P.nodes[n].get("label", ""), P.nodes[n].get("attrs") or {})
+              and not susp.get(n, {}).get("protected")]
     for n, p in ranked[:top]:
         r = roles.get(n, {})
         s = susp.get(n, {})
@@ -468,19 +581,136 @@ def full_graph_metrics(G: nx.Graph) -> dict[str, dict[str, float]]:
     return {n: {"degree": deg[n], "pagerank": round(pr[n], 6)} for n in G}
 
 
+def first_time_offender_risk(
+    P: nx.Graph,
+    susp: dict[str, dict],
+    community: dict[str, int] | None = None,
+    metrics: dict[str, dict] | None = None,
+    top: int = 20,
+) -> list[dict]:
+    """Flag clean-record individuals who are structurally embedded near high-suspicion criminal hubs.
+
+    Protected parties (victims, complainants, witnesses, police) are STRICTLY EXCLUDED
+    and receive 0.0 risk and are never returned or flagged as offenders.
+    """
+    if P.number_of_nodes() == 0:
+        return []
+
+    community = community or {}
+    metrics = metrics or {}
+    results = []
+
+    for n in P.nodes():
+        node = P.nodes[n]
+        if node.get("type") != "PERSON":
+            continue
+
+        at = node.get("attrs") or {}
+        # Strictly exclude protected parties
+        if is_protected_party(node.get("type", ""), node.get("label", ""), at):
+            continue
+        s = susp.get(n, {})
+        if s.get("protected"):
+            continue
+
+        # Clean-record individual (suspicion < 0.2, no accused record, no wanted/watchlist)
+        if s.get("score", 0) >= 0.2 or s.get("accused", 0) > 0 or s.get("watchlist"):
+            continue
+
+        neighbors = list(P.neighbors(n))
+        high_susp_neighbors = [
+            nb for nb in neighbors
+            if susp.get(nb, {}).get("score", 0) >= 0.35
+            and not is_protected_party(P.nodes[nb].get("type", ""), P.nodes[nb].get("label", ""), P.nodes[nb].get("attrs") or {})
+        ]
+
+        decay = {1: 1.0, 2: 0.3, 3: 0.09}
+        proximity_score = 0.0
+        visited = {n}
+        queue = [(n, 0)]
+        for hop in range(1, 4):
+            next_queue = []
+            for curr, _ in queue:
+                for nb in P.neighbors(curr):
+                    if nb not in visited:
+                        visited.add(nb)
+                        if is_protected_party(P.nodes[nb].get("type", ""), P.nodes[nb].get("label", ""), P.nodes[nb].get("attrs") or {}):
+                            continue
+                        nb_susp = susp.get(nb, {}).get("score", 0)
+                        if nb_susp >= 0.2:
+                            channels = P[curr][nb].get("channels", {})
+                            cf = min(3.0, 1.0 + 0.5 * len(channels))
+                            risk = decay.get(hop, 0) * nb_susp * cf
+                            proximity_score = max(proximity_score, risk)
+                        next_queue.append((nb, hop))
+            queue = next_queue
+
+        proximity_score = min(1.0, proximity_score)
+
+        if len(high_susp_neighbors) >= 3:
+            proximity_score = max(proximity_score, 0.85)
+
+        if proximity_score < 0.15 and len(high_susp_neighbors) == 0:
+            continue
+
+        reasons = []
+        if high_susp_neighbors:
+            reasons.append(f"direct links to {len(high_susp_neighbors)} high-suspicion criminal node(s)")
+        if proximity_score >= 0.5:
+            reasons.append(f"high proximity risk score ({proximity_score:.2f}) to criminal hubs")
+
+        results.append({
+            "id": n,
+            "label": node.get("label", ""),
+            "type": "FIRST_TIME_OFFENDER_RISK",
+            "risk_score": round(proximity_score, 3),
+            "proximity_score": round(proximity_score, 3),
+            "suspicion_score": s.get("score", 0.0),
+            "reasons": reasons,
+            "high_susp_contacts": len(high_susp_neighbors),
+        })
+
+    results.sort(key=lambda x: -x["risk_score"])
+    return results[:top]
+
+
+def compute_proximity_risk(P: nx.Graph, susp: dict[str, dict]) -> dict[str, float]:
+    """Return proximity risk scores for all nodes in P. Protected parties receive 0.0."""
+    scores = {}
+    for n in P.nodes():
+        node = P.nodes[n]
+        at = node.get("attrs") or {}
+        if is_protected_party(node.get("type", ""), node.get("label", ""), at) or susp.get(n, {}).get("protected"):
+            scores[n] = 0.0
+            continue
+        high_susp = [
+            nb for nb in P.neighbors(n)
+            if susp.get(nb, {}).get("score", 0) >= 0.35
+            and not is_protected_party(P.nodes[nb].get("type", ""), P.nodes[nb].get("label", ""), P.nodes[nb].get("attrs") or {})
+        ]
+        if len(high_susp) >= 3:
+            scores[n] = 0.85
+        elif len(high_susp) > 0:
+            scores[n] = round(min(1.0, 0.3 * len(high_susp)), 3)
+        else:
+            scores[n] = 0.0
+    return scores
+
+
 def run_all(G: nx.Graph, D: nx.DiGraph, anomaly_hits: dict[str, float] | None = None) -> dict[str, Any]:
     P = actor_projection(D)
     susp = suspicion_signals(D, anomaly_hits)
     metrics = compute_metrics(P)
     community = detect_communities(P)
     roles = classify_roles(P, metrics, community, D, susp)
-    priority = priority_scores(metrics, susp)
+    priority = priority_scores(metrics, susp, P)
     comms = summarize_communities(P, D, community, metrics, roles, priority, susp)
     kp = key_players(P, metrics, roles, community, priority, susp)
     br = brokers(P, metrics, roles, community, susp)
     lp = link_predictions(P, metrics, susp)
     impact = {n["id"]: removal_impact(P, n["id"], community) for n in kp[:6]}
     fm = full_graph_metrics(G)
+    fto = first_time_offender_risk(P, susp, community, metrics)
     type_counts = Counter(d["type"] for _, d in G.nodes(data=True))
     rel_counts = Counter(d["rel_type"] for _, _, d in D.edges(data=True))
     summary = {
@@ -501,4 +731,5 @@ def run_all(G: nx.Graph, D: nx.DiGraph, anomaly_hits: dict[str, float] | None = 
                    "cases": d.get("cases", 0)} for u, v, d in P.edges(data=True)]
     return {"summary": summary, "metrics": metrics, "community": community, "roles": roles, "communities": comms,
             "key_players": kp, "brokers": br, "link_predictions": lp, "removal_impact": impact, "full_metrics": fm,
-            "projection_edges": proj_edges, "suspicion": {n: s for n, s in susp.items() if n in P}, "priority": priority}
+            "projection_edges": proj_edges, "suspicion": {n: s for n, s in susp.items() if n in P}, "priority": priority,
+            "first_time_offenders": fto}

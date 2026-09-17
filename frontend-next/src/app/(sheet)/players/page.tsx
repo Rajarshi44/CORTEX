@@ -5,7 +5,7 @@ import { useKeyPlayers, useCommunities, useLinkPredictions } from "@/lib/queries
 import { useSheet } from "@/lib/store";
 import { Glyph } from "@/components/sheet/KeyRail";
 import SheetFooter from "@/components/sheet/SheetFooter";
-import { SHAPE } from "@/lib/notation";
+import { SHAPE, maskLabel } from "@/lib/notation";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Link2 } from "lucide-react";
@@ -43,7 +43,7 @@ function Players() {
                   <span className="flex items-start gap-2">
                     <Glyph shape={SHAPE[p.type]} size={14} className="mt-1 shrink-0" />
                     <span className="min-w-0">
-                      <span className="block font-semibold leading-snug">{p.label}
+                      <span className="block font-semibold leading-snug">{maskLabel(p.label, p.role)}
                         {p.aliases?.length ? <span className="font-normal text-ink-faint"> @ {p.aliases.join(", ")}</span> : null}
                       </span>
                       {/* the service's status: a word and a border, so the read never depends on hue */}
@@ -80,13 +80,13 @@ function Players() {
 
           <h2 className="label label-ink mt-8 border-b border-ink pb-1">Brokers — who bridges the groups</h2>
           <ul className="divide-y divide-rule">
-            {(kp?.brokers ?? []).map((b) => <li key={b.id} className="flex items-center gap-3 py-2"><button type="button" onClick={() => select(b.id)} className="font-semibold hover:text-pencil">{b.label}</button><span className="note">bridges {b.community_span} communities · betweenness {b.betweenness.toFixed(3)}</span><span className="figure ml-auto text-ink-soft">{b.bridges.map((x) => `#${x.community}:${x.contacts}`).join("  ")}</span></li>)}
+            {(kp?.brokers ?? []).map((b) => <li key={b.id} className="flex items-center gap-3 py-2"><button type="button" onClick={() => select(b.id)} className="font-semibold hover:text-pencil">{maskLabel(b.label)}</button><span className="note">bridges {b.community_span} communities · betweenness {b.betweenness.toFixed(3)}</span><span className="figure ml-auto text-ink-soft">{b.bridges.map((x) => `#${x.community}:${x.contacts}`).join("  ")}</span></li>)}
           </ul>
 
           <h2 className="label label-ink mt-8 border-b border-ink pb-1">Disruption — if removed</h2>
           <table className="mt-1 w-full">
             <thead><tr className="label text-left text-ink-faint"><th className="py-1 font-semibold">Target</th><th className="py-1 text-right font-semibold">Flow cut</th><th className="py-1 text-right font-semibold">Fragmentation</th><th className="py-1 font-semibold">Isolated</th></tr></thead>
-            <tbody>{Object.values(kp?.removal_impact ?? {}).map((r) => <tr key={r.node} className="border-t border-rule"><td className="py-1.5"><button type="button" onClick={() => select(r.node)} className="hover:text-pencil">{r.label}</button></td><td className="figure py-1.5 text-right text-pencil">{Math.round((r.flow_share ?? 0) * 100)}%</td><td className="figure py-1.5 text-right">{Math.round((r.community_fragmentation ?? 0) * 100)}%</td><td className="py-1.5 note">{r.isolated_after?.map((x) => x.label).join(", ") || "—"}</td></tr>)}</tbody>
+            <tbody>{Object.values(kp?.removal_impact ?? {}).map((r) => <tr key={r.node} className="border-t border-rule"><td className="py-1.5"><button type="button" onClick={() => select(r.node)} className="hover:text-pencil">{maskLabel(r.label)}</button></td><td className="figure py-1.5 text-right text-pencil">{Math.round((r.flow_share ?? 0) * 100)}%</td><td className="figure py-1.5 text-right">{Math.round((r.community_fragmentation ?? 0) * 100)}%</td><td className="py-1.5 note">{r.isolated_after?.map((x) => maskLabel(x.label)).join(", ") || "—"}</td></tr>)}</tbody>
           </table>
         </section>
 
@@ -107,7 +107,7 @@ function Players() {
                   `density ${c.density}`,
                   c.locations.length ? c.locations.slice(0, 3).join(", ") : null,
                 ].filter(Boolean).join(" · ")}</p>
-                <p className="mt-1 flex flex-wrap gap-1">{c.top_members.slice(0, 5).map((m) => <button key={m.id} type="button" onClick={() => select(m.id)} className="border border-rule-strong px-1.5 py-0.5 text-[length:var(--fs-note)] hover:border-ink">{m.label}</button>)}</p>
+                <p className="mt-1 flex flex-wrap gap-1">{c.top_members.slice(0, 5).map((m) => <button key={m.id} type="button" onClick={() => select(m.id)} className="border border-rule-strong px-1.5 py-0.5 text-[length:var(--fs-note)] hover:border-ink">{maskLabel(m.label, m.role)}</button>)}</p>
                 <button type="button" onClick={() => setHighlights(c.members, `Community #${c.id}, ${c.size} actors, emphasised on the chart.`)} className="label mt-1 border border-rule-strong px-2 py-0.5 text-ink-soft hover:border-ink hover:text-ink">Emphasise on chart</button>
               </li>
             ))}
@@ -116,7 +116,7 @@ function Players() {
           <h2 className="label label-ink mt-8 border-b border-ink pb-1">Predicted links — not yet observed</h2>
           <p className="mt-1 note">Adamic–Adar over shared associates, weighted by suspicion. Leads to check, not facts.</p>
           <ul className="divide-y divide-rule">
-            {(lp ?? []).slice(0, 8).map((p, i) => <li key={i} className="py-2"><div className="flex items-center gap-2"><button type="button" onClick={() => select(p.source)} className="font-semibold hover:text-pencil">{p.source_label}</button><Link2 className="h-3 w-3 shrink-0 text-ink-soft" aria-label="and" /><button type="button" onClick={() => select(p.target)} className="font-semibold hover:text-pencil">{p.target_label}</button><span className="figure ml-auto note">{p.score.toFixed(2)}</span></div><p className="note">{p.explanation}</p><Link href={`/chart?from=${p.source}&to=${p.target}`} className="label mt-1 inline-block border border-rule-strong px-2 py-0.5 text-ink-soft hover:border-ink hover:text-ink">Draw route</Link></li>)}
+            {(lp ?? []).slice(0, 8).map((p, i) => <li key={i} className="py-2"><div className="flex items-center gap-2"><button type="button" onClick={() => select(p.source)} className="font-semibold hover:text-pencil">{maskLabel(p.source_label)}</button><Link2 className="h-3 w-3 shrink-0 text-ink-soft" aria-label="and" /><button type="button" onClick={() => select(p.target)} className="font-semibold hover:text-pencil">{maskLabel(p.target_label)}</button><span className="figure ml-auto note">{p.score.toFixed(2)}</span></div><p className="note">{p.explanation}</p><Link href={`/chart?from=${p.source}&to=${p.target}`} className="label mt-1 inline-block border border-rule-strong px-2 py-0.5 text-ink-soft hover:border-ink hover:text-ink">Draw route</Link></li>)}
           </ul>
         </section>
       </div>

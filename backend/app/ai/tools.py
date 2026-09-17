@@ -64,20 +64,49 @@ class Ctx:
             for n, d in self.G.nodes(data=True):
                 if d["type"] in ("PHONE", "BANK_ACCOUNT", "GOV_ID", "VEHICLE") and re.sub(r"\D", "", d["label"]) == digits:
                     return n
-        return Q.fuzzy_entity(self.G, ref, tuple(want), 78)
+        res = Q.fuzzy_entity(self.G, ref, tuple(want), 78)
+        if res:
+            return res
+        # Fallback to database lookup
+        db_ent = self.db.query(Entity).filter(
+            (Entity.id == ref) | (Entity.label.ilike(ref)) | (Entity.canonical_key == low)
+        ).first()
+        if not db_ent and len(ref) >= 3:
+            db_ent = self.db.query(Entity).filter(
+                (Entity.label.ilike(f"%{ref}%")) | (Entity.canonical_key.ilike(f"%{low}%"))
+            ).first()
+        if db_ent:
+            if db_ent.id not in self.G:
+                self.G.add_node(db_ent.id, label=db_ent.label, type=db_ent.type, aliases=db_ent.aliases or [], attrs=db_ent.attrs or {})
+                self.D.add_node(db_ent.id, label=db_ent.label, type=db_ent.type, aliases=db_ent.aliases or [], attrs=db_ent.attrs or {})
+            return db_ent.id
+        return None
 
     def brief(self, n: str) -> dict:
-        d = self.G.nodes[n]
-        return {"id": n, "label": d["label"], "type": d["type"]}
+        d = self.G.nodes.get(n)
+        if d:
+            return {"id": n, "label": d.get("label", n), "type": d.get("type", "UNKNOWN")}
+        ent = self.db.get(Entity, n)
+        if ent:
+            return {"id": ent.id, "label": ent.label, "type": ent.type}
+        return {"id": n, "label": n, "type": "UNKNOWN"}
 
     def rich(self, n: str) -> dict:
-        d = self.G.nodes[n]
+        d = self.G.nodes.get(n)
+        if not d:
+            ent = self.db.get(Entity, n)
+            if ent:
+                self.G.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
+                self.D.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
+                d = self.G.nodes.get(n, {})
+            else:
+                d = {}
         susp = self.snap.get("suspicion", {}).get(n, {})
-        return {"id": n, "label": d["label"], "type": d["type"], "aliases": d.get("aliases", [])[:4],
+        return {"id": n, "label": d.get("label", n), "type": d.get("type", "UNKNOWN"), "aliases": (d.get("aliases") or [])[:4],
                 "role": self.snap.get("roles", {}).get(n, {}).get("label"),
                 "community": self.snap.get("community", {}).get(n),
                 "priority": round(self.snap.get("priority", {}).get(n, 0.0), 3),
-                "suspicion": round(susp.get("score", 0.0), 3), "degree": self.G.degree(n)}
+                "suspicion": round(susp.get("score", 0.0), 3), "degree": self.G.degree(n) if n in self.G else 0}
 
 
 Handler = Callable[[Ctx, dict], Any]
@@ -132,7 +161,7 @@ def _search_entities(ctx: Ctx, a: dict):
     if not q.strip():
         return {"query": "", "count": 0, "results": [], "error": "query is required - pass a name, number or fragment"}
     rows = Q.find_entities(ctx.db, q, a.get("types"), int(a.get("limit") or 8))
-    out = [ctx.rich(e.id) for e in rows if e.id in ctx.G]
+    out = [ctx.rich(e.id) for e in rows]
     return {"query": q, "count": len(out), "results": out,
             "note": "empty result means the name is not in this corpus - say so rather than guessing" if not out else ""}
 
@@ -146,6 +175,11 @@ def _entity_profile(ctx: Ctx, a: dict):
     n = ctx.resolve(a["entity"])
     if not n:
         return {"error": f"no entity matching '{a['entity']}'"}
+    if n not in ctx.G:
+        ent = ctx.db.get(Entity, n)
+        if ent:
+            ctx.G.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
+            ctx.D.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
     d = Q.entity_dossier(ctx.db, ctx.G, ctx.D, ctx.snap, n)
     if not d:
         return {"error": "entity not in graph"}
@@ -241,6 +275,11 @@ def _money_flow(ctx: Ctx, a: dict):
     n = ctx.resolve(a["entity"])
     if not n:
         return {"error": f"no entity matching '{a['entity']}'"}
+    if n not in ctx.G:
+        ent = ctx.db.get(Entity, n)
+        if ent:
+            ctx.G.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
+            ctx.D.add_node(ent.id, label=ent.label, type=ent.type, aliases=ent.aliases or [], attrs=ent.attrs or {})
     mf = Q.money_flow(ctx.db, ctx.G, ctx.D, n)
     ctx.highlights.append(n)
     k = int(a.get("max_transactions") or 25)
