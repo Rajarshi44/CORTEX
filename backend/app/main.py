@@ -12,7 +12,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.orm import Session
 
 from .api import (routes_agent, routes_ai, routes_auth, routes_forensics, routes_graph, routes_ingest,
-                  routes_intel, routes_sources, routes_watch)
+                  routes_intel, routes_novelty, routes_sources, routes_watch, routes_search)
 from .api.deps import analysis_service
 from .auth import bootstrap_users, current_user
 from .config import settings
@@ -58,7 +58,8 @@ app.add_middleware(GZipMiddleware, minimum_size=2048)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 for r in (routes_auth.router, routes_ingest.router, routes_graph.router, routes_intel.router, routes_sources.router,
-          routes_ai.router, routes_agent.router, routes_forensics.router, routes_watch.router):
+          routes_ai.router, routes_agent.router, routes_forensics.router, routes_watch.router,
+          routes_novelty.router, routes_search.router):
     app.include_router(r)
 
 

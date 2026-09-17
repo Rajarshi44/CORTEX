@@ -20,9 +20,10 @@ router = APIRouter(prefix="/api", tags=["intel"])
 
 
 def _alert_view(a: Alert, G) -> dict:
+    is_pending = a.review_status == "pending" and a.severity in ("high", "critical")
     return {"id": a.id, "kind": a.kind, "severity": a.severity, "title": a.title, "description": a.description, "score": a.score,
-            "status": a.status, "evidence": a.evidence, "created_at": a.created_at.isoformat(),
-            "entities": [{"id": e, "label": G.nodes[e]["label"], "type": G.nodes[e]["type"]} for e in (a.entity_ids or []) if e in G][:12]}
+            "status": a.status, "review_status": a.review_status, "reviewed_by": a.reviewed_by, "evidence": a.evidence, "created_at": a.created_at.isoformat(),
+            "entities": [{"id": e, "label": "Pending analyst review" if is_pending else G.nodes[e]["label"], "type": G.nodes[e]["type"]} for e in (a.entity_ids or []) if e in G][:12]}
 
 
 @router.get("/alerts")
@@ -44,7 +45,8 @@ def alerts(db: Annotated[Session, Depends(get_session)], _: Annotated[User, Depe
 
 
 class AlertPatch(BaseModel):
-    status: str
+    status: str | None = None
+    review_status: str | None = None
 
 
 @router.get("/alerts/detectors")
@@ -95,11 +97,20 @@ def patch_alert(alert_id: str, body: AlertPatch, db: Annotated[Session, Depends(
     a = db.get(Alert, alert_id)
     if not a:
         raise HTTPException(404, "Alert not found")
-    if body.status not in ("open", "reviewing", "dismissed", "confirmed"):
-        raise HTTPException(400, "Bad status")
-    a.status = body.status
+    if body.status is not None:
+        if body.status not in ("open", "reviewing", "dismissed", "confirmed"):
+            raise HTTPException(400, "Bad status")
+        a.status = body.status
+        audit(db, user, "alert_status", f"{a.title} -> {body.status}")
+    if body.review_status is not None:
+        if body.review_status not in ("pending", "reviewed", "escalated"):
+            raise HTTPException(400, "Bad review_status")
+        a.review_status = body.review_status
+        a.reviewed_by = user.username
+        audit(db, user, "alert_review", f"{a.title} -> {body.review_status}")
     db.commit()
-    audit(db, user, "alert_status", f"{a.title} -> {body.status}")
+    # invalidate cache since pending_reviews changed
+    analysis_service.invalidate()
     return _alert_view(a, graph_cache.get(db))
 
 

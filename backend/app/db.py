@@ -61,6 +61,7 @@ class Document(Base):
     meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     occurred_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     ingested_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     record_count: Mapped[int] = mapped_column(Integer, default=1)
 
 
@@ -138,9 +139,15 @@ class Alert(Base):
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str] = mapped_column(Text, default="")
     score: Mapped[float] = mapped_column(Float, default=0.0)
+    reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
     entity_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
     evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    status: Mapped[str] = mapped_column(String(16), default="open")  # open|reviewing|dismissed|confirmed
+    
+    # Governance Gate
+    review_status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending|reviewed|escalated
+    reviewed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    
+    status: Mapped[str] = mapped_column(String(16), default="open")  # legacy status
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

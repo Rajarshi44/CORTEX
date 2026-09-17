@@ -47,6 +47,15 @@ class AnalysisService:
         if prio:
             for e in db.query(Entity).filter(Entity.id.in_(list(prio))).all():
                 e.risk_score = float(prio.get(e.id, 0.0))
+        
+        # governance gate: track who has high-severity unreviewed alerts
+        from ..db import Alert
+        pending = set()
+        for a in db.query(Alert).filter(Alert.review_status == "pending", Alert.severity.in_(["high", "critical"])).all():
+            for eid in (a.entity_ids or []):
+                pending.add(eid)
+        snap["pending_reviews"] = list(pending)
+
         row = db.query(AnalysisSnapshot).filter(AnalysisSnapshot.kind == "network").first()
         if row is None:
             row = AnalysisSnapshot(kind="network", payload=snap, stale=False)

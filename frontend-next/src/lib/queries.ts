@@ -1,7 +1,7 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
-import type { AlertStatus, HitStatus, Severity, WatchKind } from "./types";
+import type { AlertStatus, HitStatus, Severity, WatchKind, ReviewStatus } from "./types";
 
 export const qk = {
   me: ["me"] as const,
@@ -28,6 +28,7 @@ export const qk = {
   watches: ["watches"] as const,
   watchKinds: ["watchKinds"] as const,
   watchHits: (p: unknown) => ["watchHits", p] as const,
+  novelty: ["novelty"] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: qk.me, queryFn: api.me, retry: false });
@@ -56,7 +57,7 @@ export const usePath = (a: string | null, b: string | null) => useQuery({ queryK
 export function useAlertStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: AlertStatus }) => api.patchAlert(id, status),
+    mutationFn: ({ id, status, review_status }: { id: string; status?: AlertStatus; review_status?: ReviewStatus }) => api.patchAlert(id, status, review_status),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["alerts"] }); qc.invalidateQueries({ queryKey: ["entity"] }); },
   });
 }
@@ -120,3 +121,6 @@ export function useDeleteNote() {
     onSuccess: (_, { entityId }) => qc.invalidateQueries({ queryKey: qk.entity(entityId) }),
   });
 }
+
+// ----------------------------------------------------------------- novel intelligence
+export const useNovelty = () => useQuery({ queryKey: qk.novelty, queryFn: () => api.noveltySummary(), staleTime: 120_000 });

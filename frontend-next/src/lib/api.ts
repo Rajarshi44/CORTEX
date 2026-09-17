@@ -1,5 +1,5 @@
 import type {
-  AiStatus, Alert, AlertStatus, AssistantAnswer, Community, DocumentDetail, DocumentSummary, Dossier, GeoPayload,
+  AiStatus, Alert, AlertStatus, ReviewStatus, AssistantAnswer, Community, DocumentDetail, DocumentSummary, Dossier, GeoPayload,
   DetectorRoster, EntityPage, GraphPayload, IngestStatus, KeyPlayer, Broker, LedgerVerify, LinkPrediction, LinkageReport, NodeView, PathHop,
   RemovalImpact, SourceInfo, SourceReport, Summary, TimelineEvent, User, SheetIdentity, Note,
   Severity, Watch, WatchHit, WatchKind, HitStatus,
@@ -105,7 +105,7 @@ export const api = {
 
   // ---- alerts
   alerts: (p: { status?: string; kind?: string; severity?: string; entity?: string; limit?: number } = {}) => request<Alert[]>(`/api/alerts${qs(p)}`),
-  patchAlert: (id: string, status: AlertStatus) => request<Alert>(`/api/alerts/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  patchAlert: (id: string, status?: AlertStatus, review_status?: ReviewStatus) => request<Alert>(`/api/alerts/${id}`, { method: "PATCH", body: JSON.stringify({ status, review_status }) }),
   detectors: () => request<DetectorRoster>("/api/alerts/detectors"),
 
   // ---- assistant & AI
@@ -177,6 +177,24 @@ export const api = {
   rescanWatch: (id: string) => request<Watch & { new_hits: number }>(`/api/watches/${id}/rescan`, { method: "POST" }),
   watchHits: (p: { status?: string; watch_id?: string; limit?: number } = {}) => request<WatchHit[]>(`/api/watches/hits${qs(p)}`),
   patchWatchHit: (id: number, status: HitStatus) => request<WatchHit>(`/api/watches/hits/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  // ---- novel intelligence
+  noveltySummary: (top_ghost = 15, top_fto = 20) =>
+    request<{
+      iceberg: { observed: number; estimated_total: number; dark_number: number; visibility_pct: number; source_sets: Record<string, number>; pairwise_estimates: { sources: string[]; n1: number; n2: number; overlap: number; estimate: number; ci_low: number; ci_high: number }[]; interpretation: string };
+      ghost_nodes: { type: string; node_a: { id: string; label: string; suspicion: number }; node_b: { id: string; label: string; suspicion: number }; community: number; confidence_score: number; jaccard_similarity: number; shared_neighbors_count: number; shared_neighbors: string[]; interpretation: string }[];
+      first_time_offenders: { id: string; label: string; risk_score: number; suspicion_score: number; proximity_score: number; community_risk: number; degree: number; high_risk_contacts: number; accused_contacts: number; watchlisted_contacts: number; channel_types: string[]; reasons: string[]; community: number; interpretation: string }[];
+      discrepancies: { alerts: { id: string; kind: string; severity: string; title: string; description: string; score: number; entity_ids: string[]; evidence: Record<string, unknown> }[]; total: number; by_kind: Record<string, number>; critical: number; high: number };
+      alerts: { id: string; kind: string; severity: string; title: string; description: string; score: number; entity_ids: string[]; evidence: Record<string, unknown> }[];
+      summary: { ghost_nodes_detected: number; first_time_offenders_flagged: number; discrepancies_detected: number; estimated_dark_network_size: number; visibility_pct: number; critical_alerts: number; high_alerts: number };
+    }>(`/api/novelty/summary${qs({ top_ghost, top_fto })}`),
+
+  // ---- global search
+  globalSearch: (q: string) => request<{
+    entities: { id: string; type: string; label: string; risk_score: number }[];
+    alerts: { id: string; kind: string; title: string; severity: string; review_status: string }[];
+    documents: { id: string; source_type: string; title: string; occurred_at: string | null }[];
+  }>(`/api/search${qs({ q })}`),
 
   // ---- reports
   reportMarkdown: async () => (await request<Response>("/api/reports/brief.md", {}, true)).text(),
