@@ -25,11 +25,22 @@ backend/data/*.db-*
 backend/data/cache/
 backend/data/icij/
 backend/data/models/
+cortex-enterprise/backend/data/*.db
+cortex-enterprise/backend/data/*.db-*
+cortex-enterprise/backend/data/cache/
+cortex-enterprise/backend/data/icij/
+cortex-enterprise/backend/data/models/
 *.db
 *.db-shm
 *.db-wal
 *.sqlite
 *.sqlite3
+
+# Large ML model files (always exclude regardless of location)
+*.onnx
+*.bin
+*.pt
+*.safetensors
 
 # Binaries & Executables
 *.exe
