@@ -221,9 +221,14 @@ function HitList({ hits, isLoading, hasWatches }: { hits?: WatchHit[]; isLoading
               </Link>
             )}
             {h.entity && (
-              <button type="button" onClick={() => select(h.entity!.id)} className="label border border-rule-strong px-1.5 py-0.5 hover:border-ink">
-                {h.entity.label}
-              </button>
+              <span className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => select(h.entity!.id)} className="label border border-rule-strong px-1.5 py-0.5 hover:border-ink">
+                  {h.entity.label}
+                </button>
+                <span className="label text-ink-soft">{h.entity.type.replace(/_/g, " ")}</span>
+                {h.entity.risk_score > 0 && <span className="label text-amber">Risk: {h.entity.risk_score.toFixed(2)}</span>}
+                {h.entity.aliases?.length > 0 && <span className="label text-ink-faint">aka {h.entity.aliases.join(", ")}</span>}
+              </span>
             )}
             {/* On a corpus of judgments the busiest name is often the judge. Saying so turns a
                 distraction into a row the reader can dismiss without opening it. */}

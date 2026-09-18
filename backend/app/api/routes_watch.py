@@ -54,6 +54,7 @@ def _entity_view(ent: Entity | None) -> dict | None:
         return None
     attrs = ent.attributes or {}
     return {"id": ent.id, "label": ent.label, "type": ent.type,
+            "risk_score": ent.risk_score or 0.0, "aliases": ent.aliases or [],
             "record_role": role_of(ent.type, ent.label, attrs),
             "non_subject": is_non_subject(ent.type, ent.label, attrs)}
 
