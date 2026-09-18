@@ -1,6 +1,6 @@
 "use client";
 /** Map & timeline: one scrubber drives both (specimen raise), with a numeric readout. */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useGeo, useTimeline, useHistogram } from "@/lib/queries";
@@ -11,41 +11,208 @@ import { INK, maskLabel } from "@/lib/notation";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
-const DEFAULT_CENTER: [number, number] = [77.2090, 28.6139]; // Delhi National Capital Region [lng, lat]
+const DEFAULT_CENTER: [number, number] = [77.209, 28.6139]; // Delhi National Capital Region [lng, lat]
 const DEFAULT_ZOOM = 10.5;
 
-// Robust raster basemap using CartoDB Positron and OpenStreetMap fallback
-const MAP_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-  sources: {
-    "raster-tiles": {
-      type: "raster",
-      tiles: [
-        "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+/* ---------------------------------------------------------------------------
+   EDITORIAL GeoJSON MAP STYLE
+   
+   No raster tiles, no external CDN. The basemap is rendered entirely from
+   local GeoJSON files: India state boundaries + neighbouring country outlines.
+   Every colour comes from the design system. The result is a purpose-built
+   analytical surface: no roads, no POIs, no decorative noise.
+--------------------------------------------------------------------------- */
+
+// Design-system derived map palette
+const MAP_PALETTE = {
+  ocean: "#E8EDF2",          // Cool wash — distinguishes water from land
+  land: "#F7F6F3",           // --film: warm bone canvas
+  stateFill: "#F0EFEC",      // Slightly deeper than film for state polygons
+  stateBorder: "#D4D4D0",    // Subtle state borders
+  stateBorderHover: "#606760", // --ink-faint for emphasis
+  stateHover: "#EAEAE6",     // --film-deep for hover state
+  neighbourFill: "#EDEEEC",  // Faint context for neighbouring countries
+  neighbourBorder: "#DDDDD9", // Very subtle neighbour borders
+  stateLabel: "#787774",     // --ink-faint
+  neighbourLabel: "#A0A09C", // Even fainter for context labels
+} as const;
+
+/**
+ * Build the MapLibre style specification from local GeoJSON.
+ * This replaces the raster-tile based MAP_STYLE entirely.
+ */
+function buildMapStyle(): maplibregl.StyleSpecification {
+  return {
+    version: 8,
+    name: "CORTEX Editorial",
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    sources: {
+      "india-states": {
+        type: "geojson",
+        data: "/geo/india-states.json",
+        generateId: true,
+      },
+      "neighbours": {
+        type: "geojson",
+        data: "/geo/neighbours.json",
+      },
     },
-  },
-  layers: [
-    {
-      id: "raster-layer",
-      type: "raster",
-      source: "raster-tiles",
-      minzoom: 0,
-      maxzoom: 19,
-    },
-  ],
-};
+    layers: [
+      // 1. Ocean / background
+      {
+        id: "background",
+        type: "background",
+        paint: {
+          "background-color": MAP_PALETTE.ocean,
+        },
+      },
+
+      // 2. Neighbouring countries fill — faint context
+      {
+        id: "neighbours-fill",
+        type: "fill",
+        source: "neighbours",
+        paint: {
+          "fill-color": MAP_PALETTE.neighbourFill,
+          "fill-opacity": 0.85,
+        },
+      },
+
+      // 3. Neighbouring countries border
+      {
+        id: "neighbours-border",
+        type: "line",
+        source: "neighbours",
+        paint: {
+          "line-color": MAP_PALETTE.neighbourBorder,
+          "line-width": 0.8,
+        },
+      },
+
+      // 4. India states fill — the main analytical canvas
+      {
+        id: "states-fill",
+        type: "fill",
+        source: "india-states",
+        paint: {
+          "fill-color": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            MAP_PALETTE.stateHover,
+            MAP_PALETTE.stateFill,
+          ],
+          "fill-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            3, 0.95,
+            12, 1.0,
+          ],
+        },
+      },
+
+      // 5. India state borders — editorial hairlines
+      {
+        id: "states-border",
+        type: "line",
+        source: "india-states",
+        paint: {
+          "line-color": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            MAP_PALETTE.stateBorderHover,
+            MAP_PALETTE.stateBorder,
+          ],
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            3, 0.5,
+            7, 1.0,
+            12, 1.5,
+          ],
+        },
+      },
+
+      // 6. Neighbouring country labels — very faint context
+      {
+        id: "neighbours-label",
+        type: "symbol",
+        source: "neighbours",
+        layout: {
+          "text-field": ["get", "name"],
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            3, 9,
+            6, 11,
+          ],
+          "text-font": ["Noto Sans Regular"],
+          "text-transform": "uppercase",
+          "text-letter-spacing": 0.15,
+          "text-max-width": 8,
+        },
+        paint: {
+          "text-color": MAP_PALETTE.neighbourLabel,
+          "text-halo-color": MAP_PALETTE.neighbourFill,
+          "text-halo-width": 1,
+          "text-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            3, 0.4,
+            5, 0.7,
+            8, 0.3,
+          ],
+        },
+      },
+
+      // 7. India state labels — marginalia on the analytical surface
+      {
+        id: "states-label",
+        type: "symbol",
+        source: "india-states",
+        layout: {
+          "text-field": ["get", "name"],
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4, 8,
+            6, 10,
+            9, 12,
+          ],
+          "text-font": ["Noto Sans Regular"],
+          "text-transform": "uppercase",
+          "text-letter-spacing": 0.08,
+          "text-max-width": 6,
+          "text-anchor": "center",
+          "symbol-placement": "point",
+        },
+        paint: {
+          "text-color": MAP_PALETTE.stateLabel,
+          "text-halo-color": MAP_PALETTE.stateFill,
+          "text-halo-width": 1.5,
+          "text-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            3.5, 0,
+            4.5, 0.5,
+            6, 0.9,
+            10, 0.7,
+            14, 0.3,
+          ],
+        },
+      },
+    ],
+  };
+}
 
 export default function MapLens() {
   const { data: geo } = useGeo();
   const { data: hist } = useHistogram();
-  // Empty means every kind the sheet actually holds. The chips used to be a fixed list written
-  // for the synthetic case (FIR / SIGHTING / CALL / TRANSFER), which selected nothing at all on a
-  // corpus of judgments and news and left the map blank.
   const [kinds, setKinds] = useState<string[]>([]);
   const timeWindow = useSheet((s) => s.timeWindow);
   const setTimeWindow = useSheet((s) => s.setTimeWindow);
@@ -59,6 +226,7 @@ export default function MapLens() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const markers = useRef<maplibregl.Marker[]>([]);
+  const hoveredStateId = useRef<number | string | null>(null);
 
   // day buckets for the scrubber
   const days = useMemo(() => (hist ?? []).map((h) => ({ day: String(h.bucket), total: Object.entries(h).filter(([k]) => k !== "bucket").reduce((s, [, v]) => s + Number(v), 0) })), [hist]);
@@ -71,21 +239,64 @@ export default function MapLens() {
     setTimeWindow([start.toISOString().slice(0, 10), end.toISOString().slice(0, 10) + "T23:59:59"]);
   }, [cursor, span, days, setTimeWindow]);
 
+  // Hover interactivity on state polygons
+  const setupHoverInteraction = useCallback((map: maplibregl.Map) => {
+    map.on("mousemove", "states-fill", (e: maplibregl.MapLayerMouseEvent) => {
+      if (e.features && e.features.length > 0) {
+        if (hoveredStateId.current !== null) {
+          map.setFeatureState({ source: "india-states", id: hoveredStateId.current }, { hover: false });
+        }
+        hoveredStateId.current = e.features[0].id ?? null;
+        if (hoveredStateId.current !== null) {
+          map.setFeatureState({ source: "india-states", id: hoveredStateId.current }, { hover: true });
+        }
+        map.getCanvas().style.cursor = "default";
+      }
+    });
+
+    map.on("mouseleave", "states-fill", () => {
+      if (hoveredStateId.current !== null) {
+        map.setFeatureState({ source: "india-states", id: hoveredStateId.current }, { hover: false });
+      }
+      hoveredStateId.current = null;
+    });
+  }, []);
+
+  // Initialize map with GeoJSON style
   useEffect(() => {
     if (!boxRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: boxRef.current,
-      style: MAP_STYLE,
+      style: buildMapStyle(),
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
-      attributionControl: { compact: true },
+      attributionControl: false,
+      maxBounds: [
+        [55, 2],    // Southwest corner (covers India + neighbours)
+        [100, 42],  // Northeast corner
+      ],
     });
-    // Log any tile or rendering errors for diagnostics
+
+    // Log any rendering errors for diagnostics
     map.on("error", (e) => console.error("[maplibre]", (e as unknown as { error?: { message?: string } }).error?.message ?? e));
+
+    // Navigation control — minimal, just zoom
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+
+    // Attribution for GeoJSON sources
+    map.addControl(new maplibregl.AttributionControl({
+      compact: true,
+      customAttribution: "Natural Earth · DataMeet",
+    }));
+
+    // Setup hover interactivity once the map loads
+    map.on("load", () => {
+      setupHoverInteraction(map);
+    });
+
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
-  }, []);
+  }, [setupHoverInteraction]);
 
   // location circles: risk carries ink
   useEffect(() => {
@@ -95,8 +306,38 @@ export default function MapLens() {
       if (map.getSource("locs")) (map.getSource("locs") as maplibregl.GeoJSONSource).setData(src);
       else {
         map.addSource("locs", { type: "geojson", data: src });
-        map.addLayer({ id: "locs-ring", type: "circle", source: "locs", paint: { "circle-radius": ["interpolate", ["linear"], ["get", "actors"], 0, 4, 20, 16, 60, 26], "circle-color": "rgba(237,237,234,0.55)", "circle-stroke-width": ["case", [">", ["get", "poi"], 0], 2, 1], "circle-stroke-color": ["case", [">=", ["get", "risk"], 0.3], INK.pencil, [">", ["get", "poi"], 0], INK.ink, INK.inkFaint] } });
-        map.addLayer({ id: "locs-label", type: "symbol", source: "locs", layout: { "text-field": ["get", "label"], "text-size": presentation ? 13 : 11, "text-offset": [0, 1.6], "text-font": ["Noto Sans Regular"], "text-anchor": "top" }, paint: { "text-color": INK.ink, "text-halo-color": INK.film, "text-halo-width": 1.2 } });
+        map.addLayer({
+          id: "locs-glow",
+          type: "circle",
+          source: "locs",
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["get", "actors"], 0, 12, 20, 28, 60, 40],
+            "circle-color": [
+              "case",
+              [">=", ["get", "risk"], 0.3], "rgba(176, 40, 33, 0.08)",
+              [">", ["get", "poi"], 0], "rgba(20, 22, 19, 0.05)",
+              "rgba(20, 22, 19, 0.03)"
+            ],
+            "circle-blur": 1,
+          },
+        });
+        map.addLayer({
+          id: "locs-ring",
+          type: "circle",
+          source: "locs",
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["get", "actors"], 0, 4, 20, 16, 60, 26],
+            "circle-color": "rgba(237,237,234,0.55)",
+            "circle-stroke-width": ["case", [">", ["get", "poi"], 0], 2, 1],
+            "circle-stroke-color": [
+              "case",
+              [">=", ["get", "risk"], 0.3], INK.pencil,
+              [">", ["get", "poi"], 0], INK.ink,
+              INK.inkFaint,
+            ],
+          },
+        });
+        map.addLayer({ id: "locs-label", type: "symbol", source: "locs", layout: { "text-field": ["get", "label"], "text-size": presentation ? 13 : 11, "text-offset": [0, 1.6], "text-font": ["Noto Sans Regular"], "text-anchor": "top" }, paint: { "text-color": INK.ink, "text-halo-color": MAP_PALETTE.stateFill, "text-halo-width": 1.5 } });
         map.on("click", "locs-ring", (e: maplibregl.MapLayerMouseEvent) => { const p = e.features?.[0]?.properties; if (p?.id) select(String(p.id)); });
         map.on("mouseenter", "locs-ring", () => (map.getCanvas().style.cursor = "pointer"));
         map.on("mouseleave", "locs-ring", () => (map.getCanvas().style.cursor = ""));
@@ -130,7 +371,11 @@ export default function MapLens() {
       const el = document.createElement("button");
       el.type = "button"; el.className = "cortex-pin"; el.title = `${format(new Date(ev.at), "dd MMM HH:mm")} · ${ev.summary}`;
       el.setAttribute("aria-label", el.title);
-      el.style.cssText = `width:10px;height:10px;border-radius:${ev.kind === "TRANSFER" ? "0" : "50%"};border:1.5px solid ${ev.kind === "TRANSFER" ? INK.blue : ev.kind === "FIR" ? INK.pencil : INK.ink};background:${INK.film};cursor:pointer;transform:rotate(${ev.kind === "TRANSFER" ? "45deg" : "0"})`;
+      const isTransfer = ev.kind === "TRANSFER";
+      const isFir = ev.kind === "FIR";
+      el.style.cssText = `width:10px;height:10px;border-radius:${isTransfer ? "0" : "50%"};border:1.5px solid ${isTransfer ? INK.blue : isFir ? INK.pencil : INK.ink};background:${MAP_PALETTE.land};cursor:pointer;transform:rotate(${isTransfer ? "45deg" : "0"});box-shadow:0 1px 4px rgba(0,0,0,0.12);transition:transform 120ms ease`;
+      el.onmouseenter = () => { el.style.transform = `rotate(${isTransfer ? "45deg" : "0"}) scale(1.4)`; };
+      el.onmouseleave = () => { el.style.transform = `rotate(${isTransfer ? "45deg" : "0"}) scale(1)`; };
       el.onclick = () => { const a = ev.actors?.[0]; if (a) select(a.id); setNarrative(`${format(new Date(ev.at), "dd MMM yyyy HH:mm")}: ${ev.summary}`); };
       markers.current.push(new maplibregl.Marker({ element: el }).setLngLat([ev.lon!, ev.lat!]).addTo(map));
     }
