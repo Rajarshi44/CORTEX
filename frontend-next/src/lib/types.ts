@@ -104,7 +104,7 @@ export interface WatchHit {
   created_at: string; occurred_at: string | null;
   watch: { kind: WatchKind; selector: string; reason: string; severity: Severity } | null;
   document: { id: string; title: string; source_type: string } | null;
-  entity: { id: string; label: string; type: EntityType; record_role: string | null; non_subject: boolean } | null;
+  entity: { id: string; label: string; type: EntityType; risk_score: number; aliases: string[]; record_role: string | null; non_subject: boolean } | null;
 }
 
 /**
