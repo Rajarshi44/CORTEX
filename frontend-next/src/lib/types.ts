@@ -173,3 +173,22 @@ export type EntityPage = {
   returned: number;
   complete: boolean;
 };
+
+export interface Turn {
+  id: number;
+  q: string;
+  text: string;
+  calls: any[];
+  visuals: any[];
+  highlights: any[];
+  citations: any[];
+  provider?: string;
+  model?: string;
+  steps?: number;
+  seconds?: number;
+  running: boolean;
+  error?: string;
+  stopped?: boolean;
+  searchWeb?: boolean;
+}
+

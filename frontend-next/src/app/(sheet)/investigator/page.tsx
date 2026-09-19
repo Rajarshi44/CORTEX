@@ -49,28 +49,40 @@ function Investigator() {
   const [initial, setInitial] = useQueryState("q", parseAsString);
   const [q, setQ] = useState("");
   const [searchWeb, setSearchWeb] = useState(false);
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const turns = useSheet((s) => s.investigatorTurns) as Turn[];
+  const setTurns = useSheet((s) => s.setInvestigatorTurns);
   const [atBottom, setAtBottom] = useState(true);
   const setHighlights = useSheet((s) => s.setHighlights);
   const select = useSheet((s) => s.select);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const nextId = useRef(1);
+  const nextId = useRef(turns.length > 0 ? Math.max(...turns.map(t => t.id)) + 1 : 1);
 
   const { data: caps } = useQuery({ queryKey: ["agentCaps"], queryFn: agentApi.capabilities, staleTime: 300_000, retry: 1 });
   const running = turns.some((t) => t.running);
 
+  const detailLevel = useSheet((s) => s.investigatorDetailLevel);
   const patch = useCallback((id: number, fn: (t: Turn) => Turn) => {
-    setTurns((ts) => ts.map((t) => (t.id === id ? fn(t) : t)));
-  }, []);
+    setTurns((ts) => (ts as Turn[]).map((t) => (t.id === id ? fn(t) : t)));
+  }, [setTurns]);
 
   const ask = useCallback((question: string, isWeb: boolean = searchWeb) => {
-    const s = question.trim();
-    if (!s || abortRef.current) return;
+    let qString = question.trim();
+    if (!qString || abortRef.current) return;
     const id = nextId.current++;
     const history = turns.filter((t) => !t.error && t.text).slice(-4).map((t) => ({ question: t.q, answer: t.text }));
-    setTurns((ts) => [...ts, { id, q: s, text: "", calls: [], visuals: [], highlights: [], citations: [], running: true, searchWeb: isWeb }]);
+    
+    // UI state shows the unmodified question
+    setTurns((ts) => [...(ts as Turn[]), { id, q: qString, text: "", calls: [], visuals: [], highlights: [], citations: [], running: true, searchWeb: isWeb }]);
+    
+    // Append the preference to the actual prompt sent to the LLM
+    let llmPrompt = qString;
+    if (detailLevel === "basic") {
+      llmPrompt += " (Please provide a basic summary, keep it brief.)";
+    } else {
+      llmPrompt += " (Please provide a detailed response with full analysis.)";
+    }
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -113,8 +125,8 @@ function Investigator() {
     };
 
     const prompt = isWeb
-      ? `${s}\n\n[Open Web Search requested: Please use the web_search tool to search the internet for live reporting, articles, or external context relevant to this query, and cite findings.]`
-      : s;
+      ? `${llmPrompt}\n\n[Open Web Search requested: Please use the web_search tool to search the internet for live reporting, articles, or external context relevant to this query, and cite findings.]`
+      : llmPrompt;
 
     streamAgent(prompt, history, onEvent, ctrl.signal)
       .catch((err: Error) => {
@@ -125,7 +137,7 @@ function Investigator() {
         abortRef.current = null;
         patch(id, (t) => ({ ...t, running: false, calls: t.calls.map((c) => (c.done ? c : { ...c, done: true, ok: false, summary: "interrupted" })) }));
       });
-  }, [patch, searchWeb, setHighlights, turns]);
+  }, [patch, searchWeb, setHighlights, turns, detailLevel]);
 
   const stop = () => { abortRef.current?.abort(); abortRef.current = null; };
 
@@ -269,15 +281,28 @@ function Investigator() {
 
 // ------------------------------------------------------------------------------ header
 function Header({ caps }: { caps?: { llm: boolean; provider: { label: string; model: string } | null; providers: { key: string; label: string; available: boolean }[] } }) {
+  const detailLevel = useSheet((s) => s.investigatorDetailLevel);
+  const setDetailLevel = useSheet((s) => s.setInvestigatorDetailLevel);
+
   return (
     <div className="border-b border-ink pb-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-[length:var(--fs-sheet)] font-semibold leading-none tracking-tight">Investigator</h1>
-        {caps && (
-          <p className="label text-ink-faint">
-            {caps.llm && caps.provider ? <>agent · {caps.provider.label} <span className="figure normal-case tracking-normal">{caps.provider.model}</span></> : "no model configured"}
-          </p>
-        )}
+        <div className="flex items-center gap-4">
+          <select
+            value={detailLevel}
+            onChange={(e) => setDetailLevel(e.target.value as "detailed" | "basic")}
+            className="note bg-transparent text-ink-soft border-b border-dotted border-rule-strong outline-none"
+          >
+            <option value="detailed">Detailed Analysis</option>
+            <option value="basic">Basic Summary</option>
+          </select>
+          {caps && (
+            <p className="label text-ink-faint">
+              {caps.llm && caps.provider ? <>agent · {caps.provider.label} <span className="figure normal-case tracking-normal">{caps.provider.model}</span></> : "no model configured"}
+            </p>
+          )}
+        </div>
       </div>
       <p className="mt-1 text-ink-soft">
         Ask in plain language. The agent searches the graph, the documents, the public-record connectors and the open web,

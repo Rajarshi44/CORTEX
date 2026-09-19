@@ -42,6 +42,11 @@ interface SheetState {
   setCommandOpen: (v: boolean) => void;
   notesOpen: boolean;
   setNotesOpen: (v: boolean) => void;
+
+  investigatorTurns: import("./types").Turn[];
+  setInvestigatorTurns: (turns: import("./types").Turn[] | ((prev: import("./types").Turn[]) => import("./types").Turn[])) => void;
+  investigatorDetailLevel: "detailed" | "basic";
+  setInvestigatorDetailLevel: (level: "detailed" | "basic") => void;
 }
 
 export const useSheet = create<SheetState>()(
@@ -71,10 +76,14 @@ export const useSheet = create<SheetState>()(
       setCommandOpen: (commandOpen) => set({ commandOpen }),
       notesOpen: false,
       setNotesOpen: (notesOpen) => set({ notesOpen }),
+      investigatorTurns: [],
+      setInvestigatorTurns: (turns) => set((state) => ({ investigatorTurns: typeof turns === 'function' ? turns(state.investigatorTurns) : turns })),
+      investigatorDetailLevel: "detailed",
+      setInvestigatorDetailLevel: (level) => set({ investigatorDetailLevel: level }),
     }),
     {
       name: "cortex.sheet",
-      partialize: (s) => ({ presentation: s.presentation, hiddenTypes: s.hiddenTypes, hiddenRelations: s.hiddenRelations, minPriority: s.minPriority, user: s.user }),
+      partialize: (s) => ({ presentation: s.presentation, hiddenTypes: s.hiddenTypes, hiddenRelations: s.hiddenRelations, minPriority: s.minPriority, user: s.user, investigatorDetailLevel: s.investigatorDetailLevel }),
     },
   ),
 );
