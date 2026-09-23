@@ -16,8 +16,7 @@ export default function LedgerLens() {
   const { data: l, refetch } = useLedger();
   const { data: ai } = useAiStatus();
   const { data: linkage } = useLinkage(0.55);
-  const [ds, setDs] = useState("montreal");
-  const { data: bench, isFetching: benching } = useQuery({ queryKey: ["bench", ds], queryFn: () => api.benchmarkEval(ds), staleTime: 600_000 });
+
   const [idText, setIdText] = useState("Accused holds Aadhaar 9991 2345 6789 and PAN ABCPD1234E; a second card 999123456780 was found.");
   const [ids, setIds] = useState<Awaited<ReturnType<typeof api.identifiers>> | null>(null);
   const [brief, setBrief] = useState<string | null>(null);
@@ -120,18 +119,6 @@ export default function LedgerLens() {
           </ol>
         </section>
 
-        <section className="col-span-12 lg:col-span-4">
-          <h2 className="label label-ink border-b border-ink pb-1">Method validation on real networks</h2>
-          <div className="mt-2 flex gap-1">{[["montreal", "Montreal Police gangs"], ["terrorists_911", "9/11 cells"], ["train_terrorists", "Madrid 2004"]].map(([k, v]) => <button key={k} type="button" aria-pressed={ds === k} onClick={() => setDs(k)} className={cn("label px-2 py-1", ds === k ? "label-ink pencil-line" : "text-ink-faint hover:text-ink")}>{v}</button>)}</div>
-          {benching && <p className="note mt-2">Evaluating…</p>}
-          {bench && bench.status === "ok" && (
-            <dl className="mt-2 text-[length:var(--fs-body)]">
-              {([["Nodes", bench.nodes], ["True groups", bench.true_groups], ["Detected (default)", (bench.default as Record<string, number>)?.detected_communities], ["Adjusted Rand (best)", (bench.best as Record<string, number>)?.adjusted_rand_index], ["Purity (best)", (bench.best as Record<string, number>)?.purity], ["Best resolution", bench.best_resolution]] as const).map(([k, v]) => <div key={k} className="flex justify-between border-b border-rule py-1"><dt className="text-ink-soft">{k}</dt><dd className="figure">{String(v ?? "—")}</dd></div>)}
-            </dl>
-          )}
-          {bench && bench.status !== "ok" && <p className="mt-2 note">Load this benchmark from the Sources lens first ({String(bench.reason ?? bench.status)}).</p>}
-          <p className="mt-3 note">On the labelled benchmark case, the top ten key players are all genuine network members and both burner phones were attributed to the right user via handset IMEI. Compute: {ai?.compute.engine} · {ai?.compute.betweenness_method}.</p>
-        </section>
 
         <section className="col-span-12 lg:col-span-4">
           <h2 className="label label-ink border-b border-ink pb-1">Identifier check</h2>

@@ -172,13 +172,14 @@ export default function ChoroplethMap({ stats, title = "Threat Intelligence Heat
             onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, camera }; }}
             onPointerMove={(e) => {
               if (drag.current) {
+                const currentDrag = drag.current;
                 const rect = e.currentTarget.getBoundingClientRect();
                 const sx = camera.width / rect.width;
                 const sy = camera.height / rect.height;
                 setCamera((c) => ({
                   ...c,
-                  x: Math.max(0, Math.min(1000 - c.width, drag.current!.camera.x - (e.clientX - drag.current!.x) * sx)),
-                  y: Math.max(0, Math.min(760 - c.height, drag.current!.camera.y - (e.clientY - drag.current!.y) * sy)),
+                  x: Math.max(0, Math.min(1000 - c.width, currentDrag.camera.x - (e.clientX - currentDrag.x) * sx)),
+                  y: Math.max(0, Math.min(760 - c.height, currentDrag.camera.y - (e.clientY - currentDrag.y) * sy)),
                 }));
               }
               handleMouseMove(e);

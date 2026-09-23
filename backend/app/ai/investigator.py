@@ -60,7 +60,7 @@ class Investigator:
         for c in cands:
             if c.lower() in STOP or len(c) < 3:
                 continue
-            n = Q.fuzzy_entity(self.G, c, ("PERSON", "ORGANIZATION", "LOCATION", "SOCIAL_HANDLE"), 86)
+            n = Q.fuzzy_entity(self.G, c, ("PERSON", "ORGANIZATION", "LOCATION", "SOCIAL_HANDLE"), 80)
             if n and n not in found:
                 found.append(n)
         return found

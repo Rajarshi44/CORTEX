@@ -17,7 +17,7 @@
 - **Accused**: Prabhakar Kumar, Rupesh Kumar Singh, Dev Raj
 - **Demo capability**: Hub/centrality detection
 
-### SN-B: Operation CyberHawk 2.0 — Student Mule Ring
+### SN-B: National Cyber Crime Investigation Corpus — Student Mule Ring
 - Two 19-year-old students opened mule bank accounts + SIM cards
 - ₹1.08 lakh traced across 3 accounts
 - Main beneficiary: **"Rahul alias Happy"** — still at large

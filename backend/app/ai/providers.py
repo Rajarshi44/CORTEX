@@ -121,7 +121,7 @@ class GeminiProvider(Provider):
 
     def __init__(self):
         self.api_key = _env("CNA_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", setting="gemini_api_key")
-        self.model = _env("CNA_GEMINI_MODEL", "GEMINI_MODEL", setting="gemini_model") or "gemini-2.5-flash"
+        self.model = _env("CNA_GEMINI_MODEL", "GEMINI_MODEL", setting="gemini_model") or "gemini-3.6-flash"
 
     def available(self) -> bool:
         return bool(self.api_key)

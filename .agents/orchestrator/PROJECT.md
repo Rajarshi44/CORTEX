@@ -1,4 +1,4 @@
-# Project: CORTEX SIH 2026 Fix & Polish
+# Project: CORTEX SIH 2026 Fix, Polish & Rebranding
 
 ## Architecture
 - **Backend**: FastAPI app in `backend/app` (`main.py`, `api/`, `graph/`, `ingestion/`, `ai/`, `reports/`, `sources/`, `watch/`).
@@ -16,20 +16,36 @@
 | M4 | Verifiable Evidence Ledger | `ed25519.py`, `ledger.py`, `routes_forensics.py`, `generator.py`, `ledger/page.tsx` | none | DONE |
 | M5 | Investigator AI Chat & Web Search | `agent.py`, `providers.py`, `tools.py`, `investigator/page.tsx` | none | DONE |
 | M6 | Map Rendering & UI Polish | `map/page.tsx`, `routes_geo.py`, overview/landing UI | M3 | DONE |
-| M7 | End-to-End Acceptance Verification & Forensic Audit | Verification test suites, Reviewers, Challengers, Forensic Auditor | M1-M6 | IN_PROGRESS |
+| M7 | End-to-End Acceptance Verification & Forensic Audit | Verification test suites, Reviewers, Challengers, Forensic Auditor | M1-M6 | DONE |
+| M8 | Investigator Chat History Persistence | `backend/app/db.py`, `backend/app/api/routes_intel.py`, `backend/app/ai/`, `frontend-next/src/app/(sheet)/investigator/`, `backend/tests/test_investigator.py` | none | DONE |
+| M9 | Demo Preparation & Rebranding (R1-R5) | Branding elimination (R1), 3 Real Cybercrime Cases CSVs (R2), Case Documents (R3), Chart Entity Search Bar (R4), DB Re-ingestion & Verification (R5) | none | IN_PROGRESS |
 
-## Interface Contracts
-### Loader ↔ Graph Analytics
-- Edges between persons with relationship `CONTROLS` must be represented as `CONTROLS` / `REPORTS_TO`, allowing hierarchical command tree tracing without distorting account ownership.
-- Timeline events with kind `CALL` must populate caller/callee phone entity IDs and timestamps for anomaly detectors (`call_bursts`, `night_activity`, `burner_phones`).
+## Interface Contracts & Specifications (M9)
+### R1: Rebranding & Neutral Sheet Identity
+- Title: `"National Cyber Crime Investigation Corpus"`
+- Code: `"NCIC-2026"`
+- Subtitle: `"Cyber Crime Branch / IFSO — Multi-Jurisdiction Cybercrime Network Analysis"` (API) / `"Cyber Crime Branch / IFSO — Digital Arrest, Financial Fraud, Mule Networks"` (Loader)
+- Tag conversions: `CyberHawk 2.0 Operation` -> `NCIC Investigation`, `CyberHawk 2.0 Bust` -> `NCIC Arrest`
+- Zero CyberHawk matches allowed across `backend/`, `frontend-next/`, `demo-case-data/`.
 
-### Victim Protection Contract
-- Entities with `party_role` in `{"victim", "complainant", "witness", "police"}` must:
-  - Have suspicion score 0.0 and priority score 0.0.
-  - Be excluded from community detection.
-  - Render as `[VICTIM]` or masked name in UI, brief, and PDF exports.
+### R2 & R3: New Crime Cases & Case Documents Data
+- Case A: Operation Chakra-II (CBI/Interpol, tech support fraud)
+- Case B: Jamtara Phishing Syndicate (OTP phishing, SIM cloning, KYC scams)
+- Case C: Chinese Loan App Fraud (predatory lending apps CashZone/RuPay Now, mule accounts)
+- Data requirements:
+  - `>= 45` new entity rows in `01_entities_nodes.csv`
+  - Continue entity ID sequences (e.g., P3001+, A3001+, O301+, PH301+)
+  - `>= 5` cross-case relationships in `02_relationships_edges.csv` linking across cases/existing data
+  - Realistic financial transactions in `03_financial_transactions.csv`
+  - `>= 8` realistic document entries in `05_case_documents.csv` with `>= 3` FIR or ARREST_MEMO
 
-### Evidence Ledger Contract
-- Cryptographic signatures: Ed25519 standard keypair.
-- Merkle batch: SHA-256 binary tree with inclusion proof `{leaf_index, root_hash, audit_path}`.
-- QR code: encodes brief verification URL or cryptographic attestation payload.
+### R4: Chart Page Entity Search Bar
+- Location: `frontend-next/src/app/(sheet)/chart/page.tsx`
+- First child inside `<div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-rule-strong bg-film-lift px-3 py-1.5">`
+- Input with placeholder `"Search entities…"`, dropdown of matching entities (query >= 2 chars), max 8 items
+- Clicking item selects entity via `select(node.id)` and clears query; Escape clears query; blur with 150ms delay closes dropdown.
+
+### R5: Database Re-ingestion & Verification
+- `load_demo_case.py` executes successfully (exit code 0)
+- Ingested entity count is strictly higher than pre-task count
+- All backend tests pass and frontend builds with 0 errors.

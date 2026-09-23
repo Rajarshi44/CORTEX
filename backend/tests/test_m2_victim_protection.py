@@ -224,7 +224,7 @@ def test_brief_markdown_and_pdf_masking(demo_session):
     from app.api.deps import analysis_service
     snap = analysis_service.snapshot(demo_session, force=False)
 
-    md = build_markdown(demo_session, G, D, snap, case_name="Operation CyberHawk 2.0 Brief")
+    md = build_markdown(demo_session, G, D, snap, case_name="National Cyber Crime Investigation Corpus Brief")
 
     # The mask [VICTIM] must be present
     assert "[VICTIM]" in md, "Masked token [VICTIM] must appear in generated markdown brief"
@@ -235,7 +235,7 @@ def test_brief_markdown_and_pdf_masking(demo_session):
     assert len(unmasked_victim) == 0, f"Found unmasked victim mentions in brief markdown: {unmasked_victim}"
 
     # Test build_pdf produces valid PDF bytes with masked content
-    pdf_bytes = build_pdf(md, title="Operation CyberHawk 2.0 Brief", db=demo_session)
+    pdf_bytes = build_pdf(md, title="National Cyber Crime Investigation Corpus Brief", db=demo_session)
     assert isinstance(pdf_bytes, bytes)
     assert pdf_bytes.startswith(b"%PDF"), "Output must be a valid PDF document"
     assert len(pdf_bytes) > 2000, "PDF output must contain content"

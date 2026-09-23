@@ -215,8 +215,9 @@ class InvestigatorAgent:
                     failed = str(payload)
 
             if failed and not calls and not "".join(turn_text).strip():
-                yield {"type": "error", "message": failed}
-                return
+                # If the LLM completely failed, we don't abort with an error event.
+                # We break out of the loop and let the robust deterministic Investigator take over below.
+                break
 
             text = "".join(turn_text)
             if text.strip():
@@ -252,8 +253,21 @@ class InvestigatorAgent:
 
         answer = "".join(answer_parts).strip()
         if not answer:
-            answer = ("I could not compose an answer from the retrieved facts. Try narrowing the question to one "
-                      "entity or one pattern.")
+            # LLM either failed to stream, crashed, or just output empty space.
+            # Run the deterministic (offline) investigator router on the question.
+            from .investigator import Investigator
+            inv = Investigator(self.ctx.db, self.ctx.G, self.ctx.D, self.ctx.snap)
+            fallback = inv.answer(question)
+            answer = fallback.get("fallback_answer") or fallback.get("answer") or "I could not compose an answer."
+            
+            # Merge highlights discovered by the deterministic pass
+            for n in fallback.get("highlights", {}).get("nodes", []):
+                if n not in self.ctx.highlights:
+                    self.ctx.highlights.append(n)
+            for e in fallback.get("highlights", {}).get("edges", []):
+                # The frontend expects edges to be passed via highlights
+                pass
+
         G = self.ctx.G
         highlight_ids = list(dict.fromkeys([h for h in self.ctx.highlights if h in G]))[:60]
         # de-duplicate citations, keeping first sighting order

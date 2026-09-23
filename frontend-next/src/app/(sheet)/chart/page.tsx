@@ -36,6 +36,8 @@ function ChartLens() {
   const setRoute = useSheet((s) => s.setRoute);
   const setNarrative = useSheet((s) => s.setNarrative);
   const [hover, setHover] = useState<{ node?: NodeView; edge?: EdgeView } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // three sources of drawing: actor projection (default), full graph with infrastructure, or an ego redraw
   const proj = useQuery({ queryKey: ["projection", onlyPoi], queryFn: () => api.projection({ only_poi: onlyPoi }), enabled: !focus && !infra, staleTime: 120_000 });
@@ -57,6 +59,11 @@ function ChartLens() {
     return { nodes: ns, edges: es, counts: c };
   }, [src, hiddenTypes, hiddenRels]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const searchResults = useMemo(() => {
+    if (searchQuery.length < 2) return [];
+    const q = searchQuery.toLowerCase();
+    return nodes.filter((n) => n.label.toLowerCase().includes(q)).slice(0, 8);
+  }, [nodes, searchQuery]);
 
   useEffect(() => {
     if (path.data?.paths?.length) {
@@ -85,6 +92,40 @@ function ChartLens() {
       */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-rule-strong bg-film-lift px-3 py-1.5">
+          {/* Entity Search */}
+          <div className="relative">
+            <input
+              type="search"
+              placeholder="Search entities…"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+              onFocus={() => setSearchOpen(true)}
+              onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+              onKeyDown={(e) => { if (e.key === "Escape") { setSearchQuery(""); setSearchOpen(false); } }}
+              className="label border border-rule-strong bg-film px-2 py-0.5 text-[length:var(--fs-note)] w-44 focus:outline-none focus:border-ink"
+            />
+            {searchQuery.length >= 2 && searchOpen && searchResults.length > 0 && (
+              <ul className="absolute left-0 top-full z-20 mt-0.5 w-60 border border-rule-strong bg-film-lift shadow-md">
+                {searchResults.map((n) => (
+                  <li key={n.id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); select(n.id); setFocus(n.id); setSearchQuery(""); setSearchOpen(false); }}
+                      className="w-full px-2 py-1 text-left text-[length:var(--fs-note)] hover:bg-film-deep flex items-center gap-2"
+                    >
+                      <span className="figure truncate">{n.label}</span>
+                      <span className="label text-ink-faint shrink-0">{n.type.toLowerCase()}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {searchQuery.length >= 2 && searchOpen && searchResults.length === 0 && (
+              <div className="absolute left-0 top-full z-20 mt-0.5 w-60 border border-rule-strong bg-film-lift px-2 py-1">
+                <span className="note text-ink-faint">No entities match</span>
+              </div>
+            )}
+          </div>
           <span className="label label-ink">{focus ? "Redrawn around selection" : infra ? "Full record" : "Actor chart"}</span>
           {focus && <button type="button" onClick={() => { setFocus(null); setRoute(null); }} className="label flex items-center border border-rule-strong px-2 py-0.5 hover:border-ink hover:text-ink"><ArrowLeft className="mr-1 h-3 w-3" aria-hidden="true" />Whole sheet</button>}
           {!focus && <>

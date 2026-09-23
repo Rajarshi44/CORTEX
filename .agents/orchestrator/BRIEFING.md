@@ -1,76 +1,82 @@
-# BRIEFING — 2026-09-18T01:55:00+05:30
+# BRIEFING — 2026-09-23T20:04:30+05:30
 
 ## Mission
-Orchestrate the fix and polish of CORTEX CNA application for SIH 2026 demo across all 6 core requirements: Victim Protection & Masking (R1), Investigator AI Chat (R2), Demo Loader Fixes (R3), Synthetic Data Tagging (R4), Verifiable Evidence Ledger (R5), and Demo Reliability & UI Polish (R6).
+Orchestrate CORTEX SIH 2026 Demo Preparation & Rebranding (R1: Remove all CyberHawk branding to NCIC-2026, R2: Add 3 real Indian cyber crime cases to CSVs with >=45 entities and >=5 cross-case links, R3: Populate Sources with >=8 documents, R4: Add live entity search bar to Chart page, R5: Re-ingest database, verify higher entity count and passing tests).
 
 ## 🔒 My Identity
 - Archetype: orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
 - Working directory: c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\orchestrator
 - Original parent: Sentinel / Parent Agent
-- Original parent conversation ID: a7f7c121-c90f-41f4-99dd-6486713eb9cd
+- Original parent conversation ID: 3961a7d3-374a-412d-9289-6f8633a7f0f2
 
 ## 🔒 My Workflow
 - **Pattern**: Project
 - **Scope document**: c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\orchestrator\PROJECT.md
-1. **Decompose**: 6 functional milestones (M1-M6) + 1 verification/audit milestone (M7)
+1. **Decompose**: Decomposed into M9 (CORTEX SIH 2026 Demo Preparation & Rebranding) encompassing R1-R5.
 2. **Dispatch & Execute**:
-   - Specialized workers dispatched to execute milestones with isolated directories under `.agents/`
-   - Reviewer, Challenger, and Forensic Auditor verification
+   - Phase 1 (Exploration):
+     - `explorer_rebrand_r1`: Complete handoff report for R1 branding removal across 16 files.
+     - `explorer_data_r2_r3`: Complete handoff report for R2/R3 with 64 new entities, 36 edges (6 cross-case), 12 transactions, 9 documents.
+     - `explorer_chart_search_r4_r5`: Complete handoff report for R4 Chart search bar & R5 ingestion pipeline.
+   - Phase 2 (Implementation):
+     - `worker_m9_impl_gen2`: Implementing R1-R5 changes, CSV data additions, UI updates, DB re-ingestion, and test verification.
+   - Phase 3 (Review & Challenge): 2 Reviewers, 2 Challengers.
+   - Phase 4 (Forensic Integrity Audit): Clean audit verdict.
+   - Phase 5: Sentinel victory reporting.
 3. **On failure**: Retry -> Replace -> Skip (except Auditor) -> Redistribute -> Redesign -> Escalate
 4. **Succession**: At 16 spawns, write handoff.md, cancel timers, spawn successor
 - **Work items**:
-  1. M1: Demo Loader Fixes & CDR Generation (R3, R6-part) [pending]
-  2. M2: Victim Protection & Identity Masking (R1) [pending]
-  3. M3: Synthetic Data Tagging & Provenance UI (R4, R6-part) [pending]
-  4. M4: Verifiable Evidence Ledger (Ed25519 & Merkle) (R5) [pending]
-  5. M5: Investigator AI Chat & Web Search (R2) [pending]
-  6. M6: Map Rendering & UI Polish (R6) [pending]
-  7. M7: End-to-End Acceptance Verification & Forensic Audit [pending]
-- **Current phase**: 1 (Decomposition & Dispatch)
-- **Current focus**: Milestone M1 (Demo Loader Fixes & CDR generation)
+  1. Exploration: 3 parallel Explorers for R1, R2/R3, R4/R5 [done]
+  2. Implementation: Worker for Rebranding, CSV data expansion, Chart search bar, DB re-ingestion [in-progress]
+  3. Review & Challenge: 2 Reviewers, 2 Challengers [pending]
+  4. Forensic Integrity Audit: Clean audit verdict [pending]
+  5. Sentinel victory reporting [pending]
+- **Current phase**: 2 (Implementation)
+- **Current focus**: Milestone M9 (CORTEX SIH 2026 Demo Preparation & Rebranding)
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
 - NEVER run build/test commands yourself — require workers to do so.
 - File-editing tools ONLY for metadata/state files (.md) in .agents/ folder.
 - All implementations must be genuine — no hardcoded dummy facades.
-- Note: Do NOT fix security flaws like JWT secret, rate limiting, or raw PII storage (user explicit constraint).
+- `grep -r "CyberHawk" backend/ frontend-next/ demo-case-data/` must return ZERO matches.
+- Neutral title: "National Cyber Crime Investigation Corpus", code: "NCIC-2026".
 - Forensic audit clean verdict is mandatory.
 - Never reuse subagents after completion.
 
 ## Current Parent
-- Conversation ID: a7f7c121-c90f-41f4-99dd-6486713eb9cd
-- Updated: 2026-09-18T01:55:00+05:30
+- Conversation ID: 3961a7d3-374a-412d-9289-6f8633a7f0f2
+- Updated: 2026-09-23T20:04:30+05:30
 
 ## Key Decisions Made
-- Project target: CORTEX application in `backend` and `frontend-next`, with demo dataset in `demo-case-data`.
-- M1 fixes demo loader edge typing (person->person CONTROLS becomes command structure, person->account becomes OWNS_ACCOUNT, person->phone becomes USES_PHONE) and generates `09_cdr.csv` for call detectors.
-- M2 implements party roles (victim, complainant, witness, police) excluding them from risk scoring and community detection, plus UI masking to `[VICTIM]`.
-- M3 sets default data provenance to "Real" and adds manual tagging UI capability.
-- M4 implements genuine Ed25519 signatures, Merkle batch trees with inclusion proofs, external anchor persistence, and "verify this brief" QR code generation.
-- M5 eliminates hardcoded demo fallback in `agent.py`, activates real LLM API with database tool calling and functional web search fallback.
-- M6 centers map on Delhi, uses reliable raster tile style to fix MapLibre bugs, and strips synthetic ribbons.
+- Project target: CORTEX SIH 2026 demo project in `backend`, `frontend-next`, `demo-case-data`.
+- Milestone M9 Phase 1 complete:
+  - R1: Rebrand Operation CyberHawk 2.0 -> National Cyber Crime Investigation Corpus (NCIC-2026). Ensure zero CyberHawk matches across 16 identified files.
+  - R2: Add 3 real Indian cyber crime cases (Operation Chakra-II, Jamtara, Chinese Loan App Fraud) with 64 new entities, 12 transactions, 36 edges with 6 cross-case links.
+  - R3: Populate Sources tab with 9 realistic document entries in `05_case_documents.csv` (6 FIR/ARREST_MEMO).
+  - R4: Add live entity search bar to Chart page in `frontend-next/src/app/(sheet)/chart/page.tsx`.
+  - R5: Re-ingest the database, verify entity count is higher and tests pass.
+- Phase 2 active with `worker_m9_impl_gen2`.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |---|---|---|---|---|
-| worker_m1_fix | teamwork_preview_worker | M1 Demo Loader Fixes & CDR (R3, R6) | completed | 93917f10-edcd-43e1-93f8-19b197a26f46 |
-| worker_m4_ledger | teamwork_preview_worker | M4 Evidence Ledger (R5) | failed (DNS) | f21a2623-f504-4c05-af16-be95deca1528 |
-| worker_m4_ledger_gen2 | teamwork_preview_worker | M4 Evidence Ledger (R5) Gen2 | completed | 8ee805eb-66ef-4755-85c2-c23bcc4c8ea4 |
-| worker_m2_victim | teamwork_preview_worker | M2 Victim Protection & Masking (R1) | completed | 063fa79f-8ede-4247-ac20-0a15165e05c3 |
-| worker_m3_m6_polish | teamwork_preview_worker | M3 & M6 Tagging, Map & Polish (R4, R6) | in-progress | 4d913fa2-d9a3-4220-a348-9d641a2fcbbc |
-| worker_m5_chat | teamwork_preview_worker | M5 Investigator AI Chat (R2) | completed | 1cdb1abc-59c7-4d8f-bc2c-6a1ee1ee4182 |
+| explorer_rebrand_r1 | teamwork_preview_explorer | R1 Branding Elimination | completed | 4140f963-b9c9-4663-ad1d-e0f214916cd6 |
+| explorer_data_r2_r3 | teamwork_preview_explorer | R2/R3 Indian Cybercrime CSVs & Docs | completed | 77cbf25c-31eb-485d-92bb-769847c2312b |
+| explorer_chart_search_r4_r5 | teamwork_preview_explorer | R4/R5 Chart Search Bar & DB Re-ingestion | completed | 13f9e0a2-3ec8-4201-a915-3d820507f940 |
+| worker_m9_impl | teamwork_preview_worker | R1-R5 Implementation (stopped on restart) | failed | 4b56a141-cb29-46ee-802d-08ee09c49122 |
+| worker_m9_impl_gen2 | teamwork_preview_worker | R1-R5 Implementation & DB Ingestion | in-progress | 39894ac0-b4c3-4ff3-833d-70e426c8d890 |
 
 ## Succession Status
 - Succession required: no
 - Spawn count: 6 / 16
-- Pending subagents: 4d913fa2-d9a3-4220-a348-9d641a2fcbbc
+- Pending subagents: 39894ac0-b4c3-4ff3-833d-70e426c8d890
 - Predecessor: none
 - Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: 6b912dfe-a190-4754-bd68-6406c712353d/task-27
+- Heartbeat cron: afb5f31a-635c-4f1f-a04e-bc5395058e32/task-56
 - Safety timer: none
 
 ## Artifact Index
@@ -79,3 +85,6 @@ Orchestrate the fix and polish of CORTEX CNA application for SIH 2026 demo acros
 - c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\orchestrator\PROJECT.md — Global architecture & milestone index
 - c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\orchestrator\plan.md — Step-by-step milestone execution plan
 - c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\orchestrator\progress.md — Liveness & status tracking
+- c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\explorer_rebrand_r1\handoff.md — R1 Explorer report
+- c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\explorer_data_r2_r3\handoff.md — R2/R3 Explorer report
+- c:\Users\NIRJHAR BARMA\Desktop\batcave\.agents\explorer_chart_search_r4_r5\handoff.md — R4/R5 Explorer report

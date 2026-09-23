@@ -1,0 +1,1 @@
+Load OK, stats: {'entities': 5612, 'relationships': 3074, 'documents': 20, 'sealed': 20, 'events': 219, 'alerts': 9, 'watches': 3, 'watch_hits': 5, 'transfers': 9712, 'calls': 66, 'span': '15 Mar 2025 – 01 Dec 2025', 'nodes': 5612, 'edges': 3070, 'communities': 2880, 'persons_of_interest': 16}

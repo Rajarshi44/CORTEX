@@ -82,7 +82,7 @@ function packComponents(g: Graph, pos: Map<string, Pos>, aspect = 1.6) {
     groups.push(members);
   });
   if (groups.length < 2) return;
-  const GAP = 28, PAD = 14;
+  const GAP = 12, PAD = 8;
   const boxes = groups.map((members) => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const m of members) { const p = pos.get(m)!; minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
@@ -200,11 +200,23 @@ export default function LinkChart({ nodes, edges, onSelect, onHover, emphasis, r
     }
     for (const e of edges) if (g.hasNode(e.source) && g.hasNode(e.target) && e.source !== e.target && !g.hasEdge(e.source, e.target)) g.addEdge(e.source, e.target, { weight: 0.5 + Math.min(4, Math.log2(1 + e.weight)) });
     const n = nodes.length;
-    // strong repulsion, weak gravity: clusters separate instead of collapsing into a disc
-    const base = { gravity: 0.35, scalingRatio: n > 600 ? 6 : n > 250 ? 10 : 18, strongGravityMode: false, barnesHutOptimize: n > 300, barnesHutTheta: 0.7, slowDown: 2, linLogMode: false, outboundAttractionDistribution: true, edgeWeightInfluence: 1, adjustSizes: false };
-    forceAtlas2.assign(g, { iterations: n > 600 ? 300 : 700, settings: base });
-    // short second pass with size-aware repulsion to take the overlaps out
-    forceAtlas2.assign(g, { iterations: 140, settings: { ...base, adjustSizes: true, slowDown: 4, scalingRatio: base.scalingRatio * 1.5 } });
+    const base = {
+      gravity: 0.35,
+      scalingRatio: n > 5000 ? 2 : n > 600 ? 6 : n > 250 ? 10 : 18,
+      strongGravityMode: false,
+      barnesHutOptimize: n > 300,
+      barnesHutTheta: n > 5000 ? 1.2 : 0.7,
+      slowDown: n > 5000 ? 10 : 2,
+      linLogMode: false,
+      outboundAttractionDistribution: true,
+      edgeWeightInfluence: 1,
+      adjustSizes: false
+    };
+    forceAtlas2.assign(g, { iterations: n > 5000 ? 50 : n > 600 ? 300 : 700, settings: base });
+    // short second pass with size-aware repulsion to take the overlaps out, skip for massive nets
+    if (n < 5000) {
+      forceAtlas2.assign(g, { iterations: 140, settings: { ...base, adjustSizes: true, slowDown: 4, scalingRatio: base.scalingRatio * 1.5 } });
+    }
     const next = new Map<string, Pos>();
     g.forEachNode((id, a) => next.set(id, { x: a.x as number, y: a.y as number }));
     const c = canvasRef.current;

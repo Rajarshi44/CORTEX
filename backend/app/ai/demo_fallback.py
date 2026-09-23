@@ -28,7 +28,7 @@ _ANSWERS: list[dict[str, Any]] = [
             "end-user tier, while **Abdul Karim** (P015) runs the hawala channel and **Vikram Joshi** (P016) "
             "handles crypto conversion. The IFSO primary account (A006) processed 10,000+ transactions worth "
             "₹5.24 crore in just 5 days.\n\n"
-            "**Rahul alias Happy** (P005) — the main beneficiary of the CyberHawk mule ring (SN-B) — remains "
+            "**Rahul alias Happy** (P005) — the main beneficiary of the student mule ring (SN-B) — remains "
             "**at large**.\n\n"
             "*(Source: 01_entities_nodes.csv, 02_relationships_edges.csv, 05_case_documents.csv)*\n\n"
             "**Next step**: Prioritise locating Rahul (P005) — he bridges SN-B to the other networks and is the only HIGH-risk accused not yet arrested."
@@ -61,7 +61,7 @@ _ANSWERS: list[dict[str, Any]] = [
     {
         "keywords": ["rahul"],
         "answer": (
-            "**Rahul alias Happy** (P005) is the main beneficiary of the CyberHawk 2.0 mule ring (SN-B). "
+            "**Rahul alias Happy** (P005) is the main beneficiary of the student mule ring (SN-B). "
             "Status: **AT LARGE** — not yet arrested. Risk flag: **HIGH**.\n\n"
             "- Two 19-year-old students (Amit Verma, Sunil Yadav) opened mule accounts and SIM cards for him "
             "*(source: 01_entities_nodes.csv, 05_case_documents.csv DOC-005)*\n"
@@ -133,7 +133,7 @@ _ANSWERS: list[dict[str, Any]] = [
             "- Hub node: NGO Current Account A001 (32 NCRP complaints, ~₹24 Cr)\n"
             "- Modus: fake arrest order via WhatsApp video call\n"
             "*(source: 01_entities_nodes.csv, 04_ncrp_complaints.csv)*\n\n"
-            "**SN-B — CyberHawk 2.0 Mule Ring**\n"
+            "**SN-B — Student Mule Ring**\n"
             "- 3 persons: Rahul (at large), Amit Verma, Sunil Yadav (both 19-yr students)\n"
             "- 3 mule accounts, 3 mule SIMs\n"
             "- ₹1,08,000 traced\n"
@@ -171,7 +171,7 @@ _ANSWERS: list[dict[str, Any]] = [
     {
         "keywords": ["case"],
         "answer": (
-            "**Operation CyberHawk 2.0** — Delhi Police Crime Branch / IFSO investigation announced 13 Dec 2025.\n\n"
+            "**National Cyber Crime Investigation Corpus** — Delhi Police Crime Branch / IFSO investigation announced 13 Dec 2025.\n\n"
             "An 82-year-old victim was defrauded of ₹1,16,00,000 through a 'digital arrest' scam — a fake arrest "
             "order shown via WhatsApp video call. The investigation uncovered three interconnected criminal sub-networks:\n\n"
             "- **SN-A**: Digital arrest fraud ring (Bihar → HP), using an NGO as a money laundering front. "
@@ -219,7 +219,7 @@ _ANSWERS: list[dict[str, Any]] = [
             "*(source: 05_case_documents.csv, DOC-004)*\n"
             "- Its current account A001 accumulated **₹24+ crore** across **32 NCRP complaints** from 7 states "
             "*(source: 04_ncrp_complaints.csv, 01_entities_nodes.csv)*\n"
-            "- The **Transnational Hawala Network** (O002) and **CyberHawk Mule Ring** (O003) are the other two orgs "
+            "- The **Transnational Hawala Network** (O002) and **Student Mule Ring** (O003) are the other two orgs "
             "*(source: 01_entities_nodes.csv)*\n\n"
             "**Next step**: Check MCA/ROC filings for O001's registration details and director history."
         ),
@@ -274,7 +274,7 @@ _ANSWERS: list[dict[str, Any]] = [
             "| 15 Nov 2025 | ₹1.16 Cr transferred to NGO account | SN-A |\n"
             "| 21–25 Nov 2025 | A006 burst: 10,000+ txns in 5 days | SN-C |\n"
             "| 26 Nov 2025 | IFSO raid at Dwarka hotel — 9 arrested | SN-C |\n"
-            "| 01 Dec 2025 | CyberHawk 2.0 FIR filed | SN-B |\n"
+            "| 01 Dec 2025 | Student mule network FIR filed | SN-B |\n"
             "| 05–08 Dec 2025 | Arrests: Prabhakar, Rupesh, Dev Raj | SN-A |\n"
             "| 13 Dec 2025 | Intelligence note linking all 3 networks | Cross |\n\n"
             "*(Source: 07_timeline_events.csv — 24 events total, span Mar–Dec 2025)*\n\n"
@@ -286,7 +286,7 @@ _ANSWERS: list[dict[str, Any]] = [
 
 # ---- Generic fallback ----
 _GENERIC = (
-    "This corpus covers **Operation CyberHawk 2.0** — a Delhi Police Crime Branch investigation into a "
+    "This corpus covers the **National Cyber Crime Investigation Corpus** — a Delhi Police Crime Branch / IFSO investigation into a "
     "digital-arrest fraud, mule-account ring, and transnational hawala/crypto syndicate.\n\n"
     "The sheet contains **94 entities**, **192 relationships**, **104 financial transactions**, and "
     "**16 case documents** across 3 sub-networks (SN-A, SN-B, SN-C).\n\n"

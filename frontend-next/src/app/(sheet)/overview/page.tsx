@@ -127,16 +127,6 @@ export default function Overview() {
               onHover={(hit) => setPointing(hit?.node ?? null)}
             />
           )}
-          {/* the plate, the way a printed map carries its title in a corner */}
-          <div className="pointer-events-none absolute left-3 right-3 top-3 max-w-[26rem] border border-ink bg-film-lift/95 px-3 py-2 sm:left-4 sm:top-4">
-            <h1 className="sign text-[length:clamp(1.15rem,1.6vw,1.6rem)]">{sheet?.title ?? " "}</h1>
-            <p className="figure mt-1 flex flex-wrap gap-x-3 note">
-              <span>{s?.nodes?.toLocaleString("en-IN") ?? "—"} entities</span>
-              <span>{s?.edges?.toLocaleString("en-IN") ?? "—"} relations</span>
-              <span>{groups || "—"} groups</span>
-              <span>{alerts?.length ?? 0} open alerts</span>
-            </p>
-          </div>
           {/* the key, along the bottom edge where a map's key belongs */}
           <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-rule-strong bg-film/90 px-4 py-1.5 note">
             <span className="flex items-center gap-1.5"><Glyph shape="circle" size={11} /> person</span>

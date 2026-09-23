@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================="
-Write-Host " CORTEX - Operation CyberHawk 2.0 demo"
+Write-Host " CORTEX - National Cyber Crime Investigation Corpus (NCIC-2026) demo"
 Write-Host "========================================="
 Write-Host ""
 

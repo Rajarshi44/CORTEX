@@ -42,8 +42,8 @@ DEMO_DIR = Path(__file__).resolve().parents[3] / "demo-case-data"
 CASE_ID = "DEMO-01"
 NS = uuid.UUID("6f1d5e2c-9b3a-4a7e-8f21-0c4d8e6b1a55")  # stable namespace for this demo case
 
-SHEET_TITLE = "Operation CyberHawk 2.0"
-SHEET_SUBTITLE = "Delhi Police Crime Branch / IFSO — digital-arrest fraud, mule accounts, hawala and crypto layering."
+SHEET_TITLE = "National Cyber Crime Investigation Corpus"
+SHEET_SUBTITLE = "Cyber Crime Branch / IFSO — Digital Arrest, Financial Fraud, Mule Networks"
 
 
 def _id(*parts: str) -> str:
@@ -134,9 +134,12 @@ def map_relationship(raw: str, target: Entity | None) -> str | None:
 # memo names an accused; a surveillance or forensic report names a subject; an intelligence note
 # names a mention. Only the first carries an adverse finding.
 DOC_KIND = {
+    "FIR": ("FIR", "CASE", "ACCUSED_IN"),
     "FIR_EXTRACT": ("FIR", "CASE", "ACCUSED_IN"),
     "RAID_REPORT": ("FIR", "CASE", "ACCUSED_IN"),
-    "ARREST_MEMO": ("FIR", None, "ACCUSED_IN"),
+    "ARREST_MEMO": ("ARREST_MEMO", None, "ACCUSED_IN"),
+    "NEWS": ("NEWS", "REPORT", "MENTIONED_IN"),
+    "JUDGMENT": ("JUDGMENT", "REPORT", "MENTIONED_IN"),
     "SURVEILLANCE_REPORT": ("SURVEILLANCE", "REPORT", "SUBJECT_OF"),
     "FORENSIC_REPORT": ("REPORT", "REPORT", "MENTIONED_IN"),
     "INTELLIGENCE_NOTE": ("INTEL", "REPORT", "MENTIONED_IN"),
@@ -146,7 +149,7 @@ DOC_KIND = {
 # checked against every record as it arrives, so these are the questions this case leaves open
 # rather than conclusions it has reached.
 WATCHES: list[tuple[str, str, str, str]] = [
-    ("PERSON", "Rahul", "Named as the main beneficiary of the CyberHawk mule ring and not arrested. "
+    ("PERSON", "Rahul", "Named as the main beneficiary of the student mule ring and not arrested. "
                         "Report any record naming him.", "critical"),
     ("BANK_ACCOUNT", "XXXX1234", "The NGO current account every digital-arrest complaint resolves to. "
                                  "Report any further record touching it.", "critical"),

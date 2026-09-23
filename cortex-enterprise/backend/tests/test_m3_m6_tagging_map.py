@@ -2,7 +2,7 @@
 
 Verifies:
 1. `sheet_identity` treats all ingested case corpus data as "real" system data by default:
-   kind: "real", title: "Operation CyberHawk 2.0", code: "OPS-CH2",
+   kind: "real", title: "National Cyber Crime Investigation Corpus", code: "NCIC-2026",
    subtitle: "Delhi Crime Branch / IFSO Investigation Corpus (Verified Evidence)."
 2. `describe()` in provenance module defaults to verified investigation provenance ("Real / Official Records").
 3. Explicit unverified or synthetic tags override sheet_identity appropriately.
@@ -66,7 +66,7 @@ def client(isolated_db):
 # -----------------------------------------------------------------------------
 
 def test_sheet_identity_defaults_to_real_system_data(isolated_db):
-    """Ingested case corpus data must default to real system data: kind='real', Operation CyberHawk 2.0."""
+    """Ingested case corpus data must default to real system data: kind='real', National Cyber Crime Investigation Corpus."""
     # Seed an FIR document without explicit overrides
     doc = Document(
         id="doc-fir-001",
@@ -80,8 +80,8 @@ def test_sheet_identity_defaults_to_real_system_data(isolated_db):
 
     ident = sheet_identity(isolated_db)
     assert ident["kind"] == "real", f"Expected 'real', got {ident['kind']}"
-    assert ident["title"] == "Operation CyberHawk 2.0"
-    assert ident["code"] == "OPS-CH2"
+    assert ident["title"] == "National Cyber Crime Investigation Corpus"
+    assert ident["code"] == "NCIC-2026"
     assert "Delhi Crime Branch / IFSO Investigation Corpus (Verified Evidence)" in ident["subtitle"]
 
 

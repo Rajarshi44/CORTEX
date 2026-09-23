@@ -228,8 +228,8 @@ SOURCE_NAMES = {
 def sheet_identity(db: Session) -> dict:
     """What this sheet is, derived from what is on it.
 
-    By default, all ingested case corpus data is treated as 'real' system data (Operation CyberHawk 2.0,
-    Delhi Crime Branch / IFSO Investigation Corpus (Verified Evidence)), unless explicitly marked as
+    By default, all ingested case corpus data is treated as 'real' system data (National Cyber Crime Investigation Corpus,
+    Cyber Crime Branch / IFSO — Multi-Jurisdiction Cybercrime Network Analysis), unless explicitly marked as
     unverified or synthetic.
     """
     from sqlalchemy import func
@@ -262,15 +262,15 @@ def sheet_identity(db: Session) -> dict:
                 has_explicit_unverified = True
 
     if has_explicit_synthetic:
-        return {"title": "Operation CyberHawk 2.0", "code": "OPS-CH2", "kind": "demo", "sources": srcs,
-                "subtitle": "Delhi Crime Branch / I4C Cyber Crime Investigation (Synthetic Data)."}
+        return {"title": "National Cyber Crime Investigation Corpus", "code": "NCIC-2026", "kind": "demo", "sources": srcs,
+                "subtitle": "Cyber Crime Branch / IFSO — Multi-Jurisdiction Cybercrime Network Analysis"}
     if has_explicit_unverified:
-        return {"title": "Operation CyberHawk 2.0", "code": "OPS-CH2", "kind": "unverified", "sources": srcs,
-                "subtitle": "Delhi Crime Branch / IFSO Investigation Corpus (Unverified Records)."}
+        return {"title": "National Cyber Crime Investigation Corpus", "code": "NCIC-2026", "kind": "unverified", "sources": srcs,
+                "subtitle": "Cyber Crime Branch / IFSO — Multi-Jurisdiction Cybercrime Network Analysis"}
 
     # Default: treat all ingested case corpus data as "real" system data
-    return {"title": "Operation CyberHawk 2.0", "code": "OPS-CH2", "kind": "real", "sources": srcs,
-            "subtitle": "Delhi Crime Branch / IFSO Investigation Corpus (Verified Evidence)."}
+    return {"title": "National Cyber Crime Investigation Corpus", "code": "NCIC-2026", "kind": "real", "sources": srcs,
+            "subtitle": "Cyber Crime Branch / IFSO — Multi-Jurisdiction Cybercrime Network Analysis"}
 
 
 @router.get("/sheet/identity")

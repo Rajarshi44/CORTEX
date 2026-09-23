@@ -1,7 +1,7 @@
 event_id,event_date,event_time,event_type,description,location_city,location_state,linked_entity_ids,sub_network,severity,source_document
 EV-001,2025-03-15,10:00,COMPLAINT_FILED,Earlier NCRP complaint filed regarding similar fraud,Unknown,Unknown,,SN-A,LOW,NCRP-01
 EV-002,2025-06-22,14:30,COMPLAINT_FILED,Another earlier NCRP complaint filed,Unknown,Unknown,,SN-A,LOW,NCRP-02
-EV-003,2025-10-05,11:15,ACCOUNT_OPENED,CyberHawk mule accounts opened by students,Delhi,Delhi,"P006;P007",SN-B,MEDIUM,DOC-005
+EV-003,2025-10-05,11:15,ACCOUNT_OPENED,Student mule accounts opened by students,Delhi,Delhi,"P006;P007",SN-B,MEDIUM,DOC-005
 EV-004,2025-11-05,10:30,FRAUD_COMMITTED,Victim P001 receives WhatsApp call starting digital arrest scam,Delhi,Delhi,P001,SN-A,HIGH,DOC-001
 EV-005,2025-11-15,12:45,MONEY_TRANSFER,Money transfers from victim to NGO account,Delhi,Delhi,"P001;P004",SN-A,CRITICAL,DOC-001
 EV-006,2025-11-20,08:00,SURVEILLANCE,IFSO surveillance of Dwarka hotel begins,Delhi,Delhi,,SN-C,MEDIUM,DOC-009
@@ -11,7 +11,7 @@ EV-009,2025-11-26,06:00,RAID,Dwarka hotel raid with 4 initial arrests,Delhi,Delh
 EV-010,2025-11-28,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P012,SN-C,MEDIUM,DOC-010
 EV-011,2025-11-30,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P013,SN-C,MEDIUM,DOC-011
 EV-012,2025-12-01,10:00,COMPLAINT_FILED,P001 files formal complaint,Delhi,Delhi,P001,SN-A,MEDIUM,DOC-001
-EV-013,2025-12-02,11:00,ARREST,CyberHawk arrests P006 and P007,Delhi,Delhi,"P006;P007",SN-B,MEDIUM,DOC-006
+EV-013,2025-12-02,11:00,ARREST,Police arrests P006 and P007,Delhi,Delhi,"P006;P007",SN-B,MEDIUM,DOC-006
 EV-014,2025-12-03,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P014,SN-C,MEDIUM,DOC-012
 EV-015,2025-12-04,10:00,INTELLIGENCE_ALERT,Investigation traces money to NGO account,Delhi,Delhi,P004,SN-A,HIGH,DOC-001
 EV-016,2025-12-05,14:00,ARREST,Follow-on IFSO arrest,Delhi,Delhi,P015,SN-C,MEDIUM,DOC-013

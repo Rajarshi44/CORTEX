@@ -28,7 +28,7 @@ cd backend
 cd ../frontend-next && npm run dev                                          # http://localhost:3000
 ```
 
-**The demo sheet.** `npm run dev:demo` (or `./run_demo.ps1`) loads Operation CyberHawk 2.0 from
+**The demo sheet.** `npm run dev:demo` (or `./run_demo.ps1`) loads National Cyber Crime Investigation Corpus from
 `demo-case-data/*.csv` into its own SQLite file and serves it on :8001 / :3001, so it never touches
 the database `backend/.env` names. `npm run demo:seed` reloads just the data. The loader is
 idempotent - entity ids are derived with uuid5 from the case, so a reload replaces the sheet rather
