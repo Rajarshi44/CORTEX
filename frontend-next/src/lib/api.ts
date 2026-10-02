@@ -207,5 +207,6 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  wsUrl: () => `${API_BASE.replace(/^http/, "ws")}/api/ingest/ws`,
+  // An empty API_BASE means the API shares this page's origin (the hosted build).
+  wsUrl: () => `${(API_BASE || window.location.origin).replace(/^http/, "ws")}/api/ingest/ws`,
 };

@@ -1,0 +1,23 @@
+# Render Blueprint: the CORTEX demo as a single web service (API + console, same origin),
+# preloaded with the Operation CyberHawk 2.0 case. See the Dockerfile.
+services:
+  - type: web
+    name: cortex-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: CNA_JWT_SECRET
+        generateValue: true
+      # The embedding index takes the API from ~300 MB to ~490 MB, too close to the 512 MB of the
+      # free/starter plans. Search falls back to keyword matching. Set to true on Standard (2 GB);
+      # the model is already in the image.
+      - key: CNA_SEMANTIC_SEARCH_ENABLED
+        value: "false"
+      # Optional: a key enables the investigator agent. Leave blank and the rest of the console
+      # still works fully.
+      - key: CNA_GEMINI_API_KEY
+        sync: false

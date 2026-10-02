@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{(BASE_DIR / 'data' / 'cna.db').as_posix()}"
     data_dir: Path = BASE_DIR / "data"
     samples_dir: Path = BASE_DIR / "data" / "samples"
+    # The console's static export (`NEXT_OUTPUT=export next build` -> out/). When set, the API also
+    # serves the console from its own origin; the hosted single-service build uses this.
+    static_dir: Path | None = None
 
     # What an empty database is filled with at startup: "real" chains the public-record connectors
     # (ICIJ, OpenSanctions, INTERPOL, GLEIF, NIA, Supreme Court, news), "demo" loads the synthetic

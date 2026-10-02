@@ -61,7 +61,7 @@ class SemanticIndex:
 
     # ------------------------------------------------------------------ model
     def available(self) -> bool:
-        return FASTEMBED_AVAILABLE and self.load_error is None
+        return settings.semantic_search_enabled and FASTEMBED_AVAILABLE and self.load_error is None
 
     def _get_model(self):
         if self._model is None:
@@ -95,7 +95,7 @@ class SemanticIndex:
 
     def build(self, db: Session, force: bool = False) -> dict:
         if not self.available():
-            return {"status": "unavailable", "reason": self.load_error or "fastembed not installed"}
+            return {"status": "unavailable", "reason": self.load_error or ("disabled" if not settings.semantic_search_enabled else "fastembed not installed")}
         count = db.query(Document).count()
         if not force and self._vectors is not None and count == self._doc_count:
             return {"status": "cached", "passages": len(self._passages), "documents": count}

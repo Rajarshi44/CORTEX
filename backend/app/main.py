@@ -9,6 +9,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from .api import (routes_agent, routes_ai, routes_auth, routes_forensics, routes_graph, routes_ingest,
@@ -71,3 +72,20 @@ def proxy_update_document_provenance(doc_id: str, body: routes_ingest.Provenance
 @app.get("/api/health", tags=["system"])
 def health():
     return {"status": "ok", "app": settings.app_name, "environment": settings.environment}
+
+
+if settings.static_dir and settings.static_dir.is_dir():
+    _static_root = settings.static_dir.resolve()
+
+    # Registered last, so every API route above wins. The export writes `/alerts` as both
+    # `alerts.html` and an `alerts/` folder of RSC payloads, so the page file is tried before the folder.
+    @app.get("/{path:path}", include_in_schema=False)
+    def console(path: str):
+        if path.startswith("api/"):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        path = path.strip("/")
+        for candidate in (path, f"{path}.html", f"{path}/index.html") if path else ("index.html",):
+            target = (_static_root / candidate).resolve()
+            if target.is_relative_to(_static_root) and target.is_file():
+                return FileResponse(target)
+        return FileResponse(_static_root / "404.html", status_code=404)
